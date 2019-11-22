@@ -7,23 +7,25 @@ import binascii
 from array import array
 import struct
 import collections
+import logging
 
-# specialized on Lattice iCE40-HX8K Breakout Board
-# so a FTDI FT2232H and a 2048 bit EEPROM is expected
 
 StringPosition = collections.namedtuple("StringPosition", ["offset", "length"])
 
-class EEAccessor(Ftdi):
-	"""specialized to access FT2232H EEPROM"""
+class SerialWriter(Ftdi):
+	"""specialized version to write serial numbers to FT2232H EEPROM
+	
+	specialized on Lattice iCE40-HX8K Breakout Boards
+	so a FTDI FT2232H and a 2048 bit EEPROM is expected
+	"""
 	EEPROM_SIZE = 0x100 # in bytes
-	STRING_AREA_START = 0x9a
-	STRING_AREA_END = 0xf5
+	STRING_AREA_START = 0x9a # first address in string area
+	STRING_AREA_LIMIT = 0xf6 # first address after string area
 	
 	USE_SERIAL = 0x08
 	
 	def read_eeprom_word(self, index):
 		"""read single word from the EEPROM"""
-		#return self._ctrl_transfer_in(Ftdi.SIO_READ_EEPROM, 2)
 		return self.usb_dev.ctrl_transfer(Ftdi.REQ_IN, Ftdi.SIO_READ_EEPROM, 0, index, 2, self.usb_read_timeout)
 	
 	def read_eeprom(self):
@@ -34,26 +36,38 @@ class EEAccessor(Ftdi):
 		
 		return eeprom
 	
+	def _write_eeprom_word(self, index, word):
+		self.log.debug("EEPROM word 0x{:02x} write {}".format(index, binascii.hexlify(word)))
+	
 	def _write_eeprom(self, eeprom):
 		self.check_eeprom(eeprom)
-		print("Would write:")
+		# TODO: preparation
 		for index in range(len(eeprom)//2):
 			word = eeprom[index*2:index*2+2]
-			print(binascii.hexlify(word))
+			self._write_eeprom_word(index, word)
 	
-	def set_serial_number(self, serial_number):
+	def set_serial_number_device(self, serial_number):
+		"""set new serial number to currently opened device"""
 		eeprom = self.read_eeprom()
 		self.check_eeprom(eeprom)
+		
+		self.set_serial_number_eeprom(eeprom, serial_number)
+		
+		self._write_eeprom(eeprom)
+	
+	@classmethod
+	def set_serial_number_eeprom(cls, eeprom, serial_number):
+		"""set serial number in EEPROM data"""
 		
 		# check length
 		assert len(serial_number) > 0, "Empty serial number"
 		serial_pos = StringPosition(eeprom[0x10]+eeprom[0x11], len(serial_number)*2+2)
-		assert sum(serial_pos) <= self.STRING_AREA_END, "Serial number too long, ends at address 0x{:02x}".format(sum(serial_pos)-1)
+		assert sum(serial_pos) <= cls.STRING_AREA_LIMIT, "Serial number too long, ends at address 0x{:02x}".format(sum(serial_pos)-1)
 		
-		if eeprom[0x0a] & self.USE_SERIAL == 0:
+		if eeprom[0x0a] & cls.USE_SERIAL == 0:
 			# no serial number set
 			# set serial number flag
-			eeprom[0x0a] |= self.USE_SERIAL
+			eeprom[0x0a] |= cls.USE_SERIAL
 		else:
 			# preexisting serial number
 			# clear serial number, legacy port and PnP
@@ -79,11 +93,9 @@ class EEAccessor(Ftdi):
 			addr += 1
 		
 		# update checksum
-		checksum = self.eeprom_checksum(eeprom)
+		checksum = cls.eeprom_checksum(eeprom)
 		checksum_bytes = array("B", struct.pack("<H", checksum))
 		eeprom[-2:] = checksum_bytes
-		
-		self._write_eeprom(eeprom)
 	
 	@staticmethod
 	def eeprom_checksum(eeprom):
@@ -112,7 +124,7 @@ class EEAccessor(Ftdi):
 	@classmethod
 	def check_string(cls, eeprom, offset, length):
 		assert offset >= cls.STRING_AREA_START, "String begins before string area"
-		assert offset+length <= cls.STRING_AREA_END, "String protrudes string area"
+		assert offset+length <= cls.STRING_AREA_LIMIT, "String protrudes string area"
 		assert eeprom[offset] == length, "Inconsistent string length: 0x{:02x} != 0x{:02x}".format(eeprom[offset], length)
 		assert eeprom[offset+1] == 0x03, "Not string type (0x03), but 0x{:02x}".format(eeprom[offset+1])
 	
@@ -147,13 +159,14 @@ class EEAccessor(Ftdi):
 			assert eeprom[serial_end+2] == 0x00, "Unexpected value for PnP"
 
 if __name__ == "__main__":
+	logging.basicConfig(level=logging.DEBUG)
 	#devices = [f[0] for f in Ftdi.find_all([(0x0403, 0x6010)], True) if f[0].sn is not None]
 	#devices = [f[0] for f in Ftdi.get_identifiers("ftdi:///?")]
 	devices = [f[0] for f in Ftdi.find_all([(0x0403, 0x6010)], True)]
 	print(devices)
 	desc = devices[0]
 	print(desc)
-	dev = EEAccessor()
+	dev = SerialWriter()
 	for index, desc in enumerate(devices):
 		dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
 		print("MPSSE: {}".format(dev.has_mpsse))
@@ -161,9 +174,12 @@ if __name__ == "__main__":
 		#	data = dev.read_eeprom(i)
 		#	print("{:04x}".format(i*2), binascii.hexlify(data), [chr(b) for b in data])
 		print(binascii.hexlify(dev.read_eeprom()))
+		with open("tmp.eeprom.bin", "wb") as eeprom_file:
+			eeprom = dev.read_eeprom()
+			eeprom_file.write(eeprom)
 		#eeprom = dev.read_eeprom()
 		#eeprom[-1] += 1
 		#dev.check_eeprom(eeprom)
-		dev.set_serial_number("E89000")
+		dev.set_serial_number_device("E89000")
 		
 		dev.close()
