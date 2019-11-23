@@ -3,6 +3,7 @@
 import os
 import sys
 from array import array
+import json
 
 from avocado import Test
 
@@ -33,7 +34,6 @@ class SerialWriterTest(Test):
 			eeprom = self.eeprom_from_file(filename)
 			
 			test_func(eeprom)
-		
 	
 	def test_eeprom_check_good(self):
 		self.generic_good_check_test(SerialWriter.check_eeprom)
@@ -70,9 +70,26 @@ class SerialWriterTest(Test):
 			SerialWriter.set_serial_number_eeprom(eeprom, serial_number)
 		
 		for length in range((limit-start)//2, (0x100-start)//2):
-			print("l={}".format(length))
 			eeprom = original[:]
 			serial_number = "f"*length
 			with self.assertRaises(AssertionError):
 				SerialWriter.set_serial_number_eeprom(eeprom, serial_number)
+	
+	def test_assertions_in_checks(self):
+		path = self.get_data("faulty_eeprom.json", must_exist=True)
+		with open(path, "r") as json_file:
+			case_dict = json.load(json_file)
+		
+		for filename, faulty in case_dict.items():
+			eeprom = self.eeprom_from_file(filename)
 			
+			for raises_error, check_func in zip(faulty, (
+				SerialWriter.check_eeprom,
+				SerialWriter.check_eeprom_checksum,
+				SerialWriter.check_eeprom_strings
+			)):
+				if raises_error:
+					with self.assertRaises(AssertionError):
+						check_func(eeprom)
+				else:
+					check_func(eeprom)

@@ -1,0 +1,92 @@
+{
+ "eeprom_no_serial.bin": [
+  false,
+  false,
+  false
+ ],
+ "eeprom_no_serial.checksum.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_no_serial.checksum_high.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_no_serial.checksum_low.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_no_serial.checksum_one.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_no_serial.checksum_zero.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_no_serial.sn_flag.bin": [
+  true,
+  false,
+  true
+ ],
+ "eeprom_no_serial.too_long.bin": [
+  true,
+  false,
+  false
+ ],
+ "eeprom_no_serial.too_short.bin": [
+  true,
+  false,
+  false
+ ],
+ "eeprom_serial.bin": [
+  false,
+  false,
+  false
+ ],
+ "eeprom_serial.checksum.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_serial.checksum_high.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_serial.checksum_low.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_serial.checksum_one.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_serial.checksum_zero.bin": [
+  true,
+  true,
+  false
+ ],
+ "eeprom_serial.sn_gap.bin": [
+  true,
+  false,
+  true
+ ],
+ "eeprom_serial.too_long.bin": [
+  true,
+  false,
+  false
+ ],
+ "eeprom_serial.too_short.bin": [
+  true,
+  false,
+  false
+ ]
+}
