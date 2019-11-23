@@ -8,7 +8,7 @@ from array import array
 import struct
 import collections
 import logging
-
+import argparse
 
 StringPosition = collections.namedtuple("StringPosition", ["offset", "length"])
 
@@ -165,28 +165,48 @@ class SerialWriter(Ftdi):
 			assert eeprom[serial_end+1] == 0x03, "Unexpected value for legacy port low byte"
 			assert eeprom[serial_end+2] == 0x00, "Unexpected value for PnP"
 
+def create_argument_parser():
+	arg_parser = argparse.ArgumentParser()
+	arg_parser.set_defaults(func=None)
+	sub_parser = arg_parser.add_subparsers()
+	
+	arg_read = sub_parser.add_parser("read")
+	arg_read.add_argument("-o", "--output", default=None, type=argparse.FileType("wb"), help="name of the output file")
+	arg_read.set_defaults(func=read_eeprom)
+	
+	arg_sn = sub_parser.add_parser("serial_number", aliases=["sn"])
+	arg_sn.set_defaults(func=set_serial_number)
+	
+	return arg_parser
+
+def read_eeprom(arguments):
+	devices = [f[0] for f in Ftdi.find_all([(0x0403, 0x6010)], True)]
+	desc = devices[0]
+	dev = SerialWriter()
+	dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
+	eeprom = dev.read_eeprom()
+	dev.close()
+	if arguments.output is None:
+		print("EEPROM from {}:".format(desc), end="")
+		for addr, value in enumerate(eeprom):
+			if addr%2 == 0:
+				print("\n{:02x}: ".format(addr), end="")
+			print("{:02x}".format(value), end="")
+		print()
+		
+	else:
+		arguments.output.write(eeprom)
+
+def set_serial_number(arguments):
+	pass
+
 if __name__ == "__main__":
 	logging.basicConfig(level=logging.DEBUG)
-	#devices = [f[0] for f in Ftdi.find_all([(0x0403, 0x6010)], True) if f[0].sn is not None]
-	#devices = [f[0] for f in Ftdi.get_identifiers("ftdi:///?")]
-	devices = [f[0] for f in Ftdi.find_all([(0x0403, 0x6010)], True)]
-	print(devices)
-	desc = devices[0]
-	print(desc)
-	dev = SerialWriter()
-	for index, desc in enumerate(devices):
-		dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
-		print("MPSSE: {}".format(dev.has_mpsse))
-		#for i in range(128):
-		#	data = dev.read_eeprom(i)
-		#	print("{:04x}".format(i*2), binascii.hexlify(data), [chr(b) for b in data])
-		print(binascii.hexlify(dev.read_eeprom()))
-		with open("tmp.eeprom.bin", "wb") as eeprom_file:
-			eeprom = dev.read_eeprom()
-			eeprom_file.write(eeprom)
-		#eeprom = dev.read_eeprom()
-		#eeprom[-1] += 1
-		#dev.check_eeprom(eeprom)
-		dev.set_serial_number_device("E89000")
-		
-		dev.close()
+	
+	parser = create_argument_parser()
+	arguments = parser.parse_args()
+	
+	if arguments.func is None:
+		parser.print_help()
+	else:
+		arguments.func(arguments)
