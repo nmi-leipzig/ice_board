@@ -3,6 +3,7 @@
 import os
 import sys
 from array import array
+import json
 
 sys.path.append(
 	os.path.dirname(
@@ -31,8 +32,9 @@ def load_eeprom(filename):
 
 def fix_checksum(eeprom):
 	checksum = SerialWriter.eeprom_checksum(eeprom)
-	eeprom[-2] == (checksum & 0xff)
-	eeprom[-1] == (checksum >> 8)
+	
+	eeprom[-2] = (checksum & 0xff)
+	eeprom[-1] = (checksum >> 8)
 
 def add_case(case_dict, eeprom, filename, variant, faulty):
 	"""
@@ -48,7 +50,6 @@ if __name__ == "__main__":
 	serial_filename = "eeprom_serial.bin"
 	no_serial_filename = "eeprom_no_serial.bin"
 	"""
-	#set_serial_eeprom with too long serial
 	#manufaturerer, product and serial number
 		#start before string area
 		#end after string area
@@ -57,7 +58,10 @@ if __name__ == "__main__":
 		#unexpected start point (gaps)
 	"""
 	
-	case_dict = {}
+	case_dict = {
+		serial_filename: (False, False, False),
+		no_serial_filename: (False, False, False)
+	}
 	for filename in (serial_filename, no_serial_filename):
 		original = load_eeprom(filename)
 		
@@ -115,6 +119,6 @@ if __name__ == "__main__":
 	fix_checksum(eeprom)
 	add_case(case_dict, eeprom, serial_filename, "sn_gap", (True, False, True))
 	
+	with open("faulty_eeprom.json", "w") as json_file:
+		json.dump(case_dict, json_file, indent=1, sort_keys=True)
 	
-	print(case_dict)
-
