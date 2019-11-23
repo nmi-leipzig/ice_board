@@ -164,6 +164,12 @@ class SerialWriter(Ftdi):
 			assert eeprom[serial_end] == 0x02, "Unexpected value for legacy port high byte"
 			assert eeprom[serial_end+1] == 0x03, "Unexpected value for legacy port low byte"
 			assert eeprom[serial_end+2] == 0x00, "Unexpected value for PnP"
+	
+	@classmethod
+	def find_lattice(cls):
+		ft2232_devices = cls.find_all([(0x0403, 0x6010)], True)
+		lattice_devices = [f[0] for f in ft2232_devices if f[0].description=="Lattice FTUSB Interface Cable"]
+		return lattice_devices
 
 def create_argument_parser():
 	arg_parser = argparse.ArgumentParser()
@@ -180,7 +186,7 @@ def create_argument_parser():
 	return arg_parser
 
 def read_eeprom(arguments):
-	devices = [f[0] for f in Ftdi.find_all([(0x0403, 0x6010)], True)]
+	devices = SerialWriter.find_lattice()
 	desc = devices[0]
 	dev = SerialWriter()
 	dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
