@@ -38,10 +38,17 @@ class SerialWriter(Ftdi):
 	
 	def _write_eeprom_word(self, index, word):
 		self.log.debug("EEPROM word 0x{:02x} write {}".format(index, binascii.hexlify(word)))
+		value = struct.unpack("<H", word)[0]
+		return self.usb_dev.ctrl_transfer(Ftdi.REQ_OUT, Ftdi.SIO_WRITE_EEPROM, value, index, 2, self.usb_read_timeout)
 	
 	def _write_eeprom(self, eeprom):
 		self.check_eeprom(eeprom)
-		# TODO: preparation
+		
+		# preparation
+		self._reset_device()
+		self.poll_modem_status()
+		self.set_latency_timer(0x77)
+		
 		for index in range(len(eeprom)//2):
 			word = eeprom[index*2:index*2+2]
 			self._write_eeprom_word(index, word)
