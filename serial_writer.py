@@ -9,8 +9,11 @@ import struct
 import collections
 import logging
 import argparse
+import re
+import sys
 
 StringPosition = collections.namedtuple("StringPosition", ["offset", "length"])
+DeviceNode = collections.namedtuple("DeviceNode", ["bus", "address"])
 
 class SerialWriter(Ftdi):
 	"""specialized version to write serial numbers to FT2232H EEPROM
@@ -171,6 +174,13 @@ class SerialWriter(Ftdi):
 		lattice_devices = [f[0] for f in ft2232_devices if f[0].description=="Lattice FTUSB Interface Cable"]
 		return lattice_devices
 
+def parse_device(string):
+	res = re.match(r"(?P<bus>\d+):(?P<address>\d+)", string)
+	if res is not None:
+		return DeviceNode(int(res.group("bus")), int(res.group("address")))
+	
+	raise argparse.ArgumentTypeError("'{}' is not a valid device specification".format(string))
+
 def create_argument_parser():
 	arg_parser = argparse.ArgumentParser()
 	arg_parser.set_defaults(func=None)
@@ -178,6 +188,7 @@ def create_argument_parser():
 	
 	arg_read = sub_parser.add_parser("read")
 	arg_read.add_argument("-o", "--output", default=None, type=argparse.FileType("wb"), help="name of the output file")
+	arg_read.add_argument("-d", "--device", default=None, type=parse_device, help="specification of the USB device in the form bus:address")
 	arg_read.set_defaults(func=read_eeprom)
 	
 	arg_sn = sub_parser.add_parser("serial_number", aliases=["sn"])
@@ -186,8 +197,16 @@ def create_argument_parser():
 	return arg_parser
 
 def read_eeprom(arguments):
-	devices = SerialWriter.find_lattice()
-	desc = devices[0]
+	if arguments.device is None:
+		logging.warning("No device specified, take first suitable device")
+		devices = SerialWriter.find_lattice()
+		try:
+			desc = DeviceNode(devices[0].bus, devices[0].address)
+		except IndexError:
+			logging.error("No suitable device connected")
+			sys.exit(-1)
+	else:
+		desc = arguments.device
 	dev = SerialWriter()
 	dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
 	eeprom = dev.read_eeprom()
