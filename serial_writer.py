@@ -11,9 +11,13 @@ import logging
 import argparse
 import re
 import sys
+import serial_utils
 
 StringPosition = collections.namedtuple("StringPosition", ["offset", "length"])
 DeviceNode = collections.namedtuple("DeviceNode", ["bus", "address"])
+
+class ExistingSerialError(Exception):
+	pass
 
 class SerialWriter(Ftdi):
 	"""specialized version to write serial numbers to FT2232H EEPROM
@@ -56,18 +60,24 @@ class SerialWriter(Ftdi):
 			word = eeprom[index*2:index*2+2]
 			self._write_eeprom_word(index, word)
 	
-	def set_serial_number_device(self, serial_number):
+	def set_serial_number_device(self, serial_number, overwrite=True):
 		"""set new serial number to currently opened device"""
 		eeprom = self.read_eeprom()
 		self.check_eeprom(eeprom)
 		
-		self.set_serial_number_eeprom(eeprom, serial_number)
+		overwritten = self.set_serial_number_eeprom(eeprom, serial_number)
+		
+		if not overwrite and overwritten:
+			raise ExistingSerialError("Serial number already set. Can't set new one as overwriting is diabled.")
 		
 		self._write_eeprom(eeprom)
 	
 	@classmethod
 	def set_serial_number_eeprom(cls, eeprom, serial_number):
-		"""set serial number in EEPROM data"""
+		"""set serial number in EEPROM data
+		
+		return True iff an existing serial number was overwritten
+		"""
 		
 		# check length
 		assert len(serial_number) > 0, "Empty serial number"
@@ -78,11 +88,13 @@ class SerialWriter(Ftdi):
 			# no serial number set
 			# set serial number flag
 			eeprom[0x0a] |= cls.USE_SERIAL
+			overwritten = False
 		else:
 			# preexisting serial number
 			# clear serial number, legacy port and PnP
 			for addr in range(eeprom[0x12], eeprom[0x12]+eeprom[0x13]+3):
 				eeprom[addr] = 0x00
+			overwritten = True
 		
 		# write new serial number
 		eeprom[0x12] = serial_pos.offset
@@ -106,6 +118,8 @@ class SerialWriter(Ftdi):
 		checksum = cls.eeprom_checksum(eeprom)
 		checksum_bytes = array("B", struct.pack("<H", checksum))
 		eeprom[-2:] = checksum_bytes
+		
+		return overwritten
 	
 	@staticmethod
 	def eeprom_checksum(eeprom):
@@ -192,6 +206,12 @@ def create_argument_parser():
 	arg_read.set_defaults(func=read_eeprom)
 	
 	arg_sn = sub_parser.add_parser("serial_number", aliases=["sn"])
+	arg_sn.add_argument("-d", "--device", default=None, type=parse_device, help="specification of the USB device in the form bus:address")
+	arg_sn.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+	arg_sn.add_argument("-g", "--group", default="E", type=str, choices=serial_utils.ALLOWED_DIGITS, help="organizational group the device belongs to")
+	arg_sn.add_argument("-b", "--board_type", default="8", type=str, choices=serial_utils.ALLOWED_DIGITS, help="type of the physical device")
+	arg_sn.add_argument("-s", "--sequential", default=0, type=int, help="sequential number")
+	arg_sn.add_argument("-a", "--already", action="store_true", help="flash even if a serial number is already set")
 	arg_sn.set_defaults(func=set_serial_number)
 	
 	return arg_parser
@@ -223,7 +243,90 @@ def read_eeprom(arguments):
 		arguments.output.write(eeprom)
 
 def set_serial_number(arguments):
-	pass
+	if arguments.interactive:
+		sequential = arguments.sequential
+		go_on = True
+		while go_on:
+			input("Press Enter to scan for devices")
+			# find devices
+			devices = SerialWriter.find_lattice()
+			if not arguments.already:
+				devices = [d for d in devices if d.sn is None]
+			if len(devices) == 0:
+				print("No suitable device found")
+				continue
+			# choice by user
+			serial_number = serial_utils.create_serial_number(
+				sequential,
+				arguments.board_type,
+				arguments.group
+			)
+			str_list = ["Choose device to set serial number {}\n".format(serial_number)]
+			for i, device in enumerate(devices):
+				str_list.append("[{}] bus {}, addr {}, sn '{}'\n".format(i, device.bus, device.address, device.sn))
+			str_list.append("[b] back\n")
+			str_list.append("[q] quit\n")
+			str_list.append("default: 0\n")
+			choice = input("".join(str_list))
+			
+			if choice == "":
+				dev_index = 0
+			elif choice == "b":
+				continue
+			elif choice == "q":
+				go_on = False
+				break
+			else:
+				try:
+					dev_index = int(choice)
+				except ValueError:
+					print("Invalid choice")
+					continue
+			
+			if dev_index not in range(len(devices)):
+				print("Invalid device index")
+				continue
+			
+			# write serial
+			desc = devices[dev_index]
+			dev = SerialWriter()
+			dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
+			try:
+				dev.set_serial_number_device(serial_number, arguments.already)
+				sequential += 1
+				print("Set serial number '{}' for device at bus {}, address {}".format(serial_number, desc.bus, desc.address))
+			except ExistingSerialError:
+				logging.error("Device already has serial number. Don't overwrite.")
+			finally:
+				dev.close()
+		
+	else:
+		# find device
+		if arguments.device is None:
+			logging.warning("No device specified, take first suitable device")
+			try:
+				desc = DeviceNode(devices[0].bus, devices[0].address)
+			except IndexError:
+				logging.error("No suitable device connected")
+				sys.exit(-1)
+		else:
+			desc = arguments.device
+		
+		dev = SerialWriter()
+		dev.open_from_url("ftdi://::{:x}:{:x}/1".format(desc.bus, desc.address))
+		serial_number = serial_utils.create_serial_number(
+			arguments.sequential,
+			arguments.board_type,
+			arguments.group
+		)
+		logging.info("Set serial unumber for device at bus {}, address {} to {}".format(desc.bus, desc.address, serial_number))
+		try:
+			dev.set_serial_number_device(serial_number, arguments.already)
+		except ExistingSerialError:
+			logging.error("Device already has serial number. Don't overwrite.")
+		finally:
+			dev.close()
+		
 
 if __name__ == "__main__":
 	logging.basicConfig(level=logging.DEBUG)
