@@ -168,17 +168,17 @@ def create_argument_parser():
 	arg_parser.set_defaults(func=None)
 	sub_parser = arg_parser.add_subparsers()
 	
-	arg_gen = sub_parser.add_parser("generate")
+	arg_gen = sub_parser.add_parser("generate", aliases=["gen"])
 	arg_gen.add_argument("-g", "--group", default="E", type=str, choices=ALLOWED_DIGITS, help="organizational group the device belongs to")
 	arg_gen.add_argument("-b", "--board_type", default="8", type=str, choices=ALLOWED_DIGITS, help="type of the physical device")
-	arg_gen.add_argument("-s", "--start", default=0, type=int, help="start of the sequential number")
+	arg_gen.add_argument("-s", "--sequential", default=0, type=int, help="first sequential number")
 	arg_gen.add_argument("-n", "--number", default=1, type=int, help="amount of serial numbers to be generated")
 	arg_gen.set_defaults(func=generate)
 	
 	arg_check = sub_parser.add_parser("check_all")
 	arg_check.set_defaults(func=check_all)
 	
-	arg_decode = sub_parser.add_parser("decode")
+	arg_decode = sub_parser.add_parser("decode", aliases=["dec"])
 	arg_decode.add_argument("-s", "--serial_number", default=None, type=str, required=True, help="serial number to be decoded")
 	arg_decode.set_defaults(func=decode)
 	
