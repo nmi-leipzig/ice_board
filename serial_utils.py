@@ -186,7 +186,7 @@ def create_argument_parser():
 
 def generate(arguments):
 	serial_list = create_serial_range(
-		range(arguments.start, arguments.start+arguments.number),
+		range(arguments.sequential, arguments.sequential+arguments.number),
 		arguments.board_type,
 		arguments.group
 	)
