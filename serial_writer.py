@@ -247,7 +247,9 @@ def set_serial_number(arguments):
 		sequential = arguments.sequential
 		go_on = True
 		while go_on:
-			input("Press Enter to scan for devices")
+			choice = input("Press Enter to scan for devices ")
+			if choice == "q":
+				break
 			# find devices
 			devices = SerialWriter.find_lattice()
 			if not arguments.already:
@@ -303,6 +305,9 @@ def set_serial_number(arguments):
 	else:
 		# find device
 		if arguments.device is None:
+			devices = SerialWriter.find_lattice()
+			if not arguments.already:
+				devices = [d for d in devices if d.sn is None]
 			logging.warning("No device specified, take first suitable device")
 			try:
 				desc = DeviceNode(devices[0].bus, devices[0].address)
