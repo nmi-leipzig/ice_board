@@ -31,7 +31,17 @@ def serial_number_checksum(serial_number):
 	
 	return mod_sum % 31
 
+def is_valid_serial_number(serial_number):
+	try:
+		check_serial_number(serial_number)
+	except MalformedSerial:
+		return False
+	
+	return True
+
 def check_serial_number(serial_number):
+	if serial_number is None:
+		raise MalformedSerial("Serial number is None")
 	if len(serial_number) != 6:
 		raise MalformedSerial("Serial number should contain exactly 6 digits, but contains {}".format(len(serial_number)))
 	for digit in serial_number:
