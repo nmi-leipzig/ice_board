@@ -36,7 +36,7 @@ class FPGABoard:
 		self._spi_gpio = self._spi_ctrl.get_gpio()
 		self._spi_gpio.set_direction(self.CRESET | self.CDONE | self.CS, self.CRESET | self.CS)
 		self._gpio_out = 0
-		self._set_creset(True)
+		self._set_gpio_out(True, True)
 	
 	@property
 	def uart(self):
@@ -73,16 +73,14 @@ class FPGABoard:
 		
 		self._log.debug("CDONE: {}".format("high" if self._get_cdone() else "low"))
 		
-		self._set_creset(False)
-		
 		# chip select to low to trigger configuration as SPI peripheral
 		#self._spi.read(0, False, False)
-		self._set_cs(False)
+		self._set_gpio_out(False, False)
 		self._spi.flush()
 		
 		self.usleep(100)
 		
-		self._set_creset(True)
+		self._set_gpio_out(False, True)
 		self._spi.flush()
 		
 		# wait for FPGA to clear it's internal configuration memory
@@ -96,7 +94,7 @@ class FPGABoard:
 		
 		# chip select to high
 		#self._spi.read(0, False, True)
-		self._set_cs(True)
+		self._set_gpio_out(True, True)
 		
 		# wait 100 SPI clock cycles for CDONE to go high
 		self._spi.write(bytes([0x00]*13), False, False)
@@ -114,20 +112,23 @@ class FPGABoard:
 		
 		# SPI pins now also available as user IO (from the FPGA perspective), but they are not used
 	
-	def _set_creset(self, high=True):
-		self._set_gpio_out(self.CRESET, high)
-	
-	def _set_cs(self, high=True):
-		self._set_gpio_out(self.CS, high)
-	
-	def _set_gpio_out(self, pin, high):
-		if high:
-			self._gpio_out |= pin
+	def _set_gpio_out(self, cs=True, creset=True):
+		"""set select and reset
+		
+		set both outputs at the same time since the python interface is too slow to set them with two function calls
+		"""
+		
+		if cs:
+			self._gpio_out |= self.CS
 		else:
-			self._gpio_out &= 0xffff ^ pin
+			self._gpio_out &= 0xffff ^ self.CS
+		
+		if creset:
+			self._gpio_out |= self.CRESET
+		else:
+			self._gpio_out &= 0xffff ^ self.CRESET
 		
 		self._spi_gpio.write(self._gpio_out)
-		
 	
 	def _get_cdone(self):
 		gpio = self._spi_gpio.read()
