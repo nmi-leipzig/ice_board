@@ -15,9 +15,13 @@ import icebox
 
 
 class FPGABoard:
+	
+	SCK = 1 # ADBUS0
+	MOSI = 1 << 1 # ADBUS1
+	MISO = 1 << 2 # ADBUS2
+	CS = 1 << 4 # ADBUS4
 	CDONE = 1 << 6 # ADBUS6
 	CRESET = 1 << 7 # ADBUS7
-	CS = 1 << 4
 	
 	def __init__(self, serial_number, baudrate=3000000, timeout=0.5):
 		self._log = logging.getLogger(type(self).__name__)
@@ -29,14 +33,23 @@ class FPGABoard:
 		)
 		# there is only one cs connected, but it is ADBUS4, not ADBUS3
 		# since ADBUS3 is not used, simply configure two cs' but only use the second one
-		self._spi_ctrl = SpiController(cs_count=1)
+		#self._spi_ctrl = SpiController(cs_count=1)
 		# latency=1
-		self._spi_ctrl.configure("ftdi://::{}/1".format(self._serial_number), frequency=6e6)
-		self._spi = self._spi_ctrl.get_port(0, mode=2)
-		self._spi_gpio = self._spi_ctrl.get_gpio()
-		self._spi_gpio.set_direction(self.CRESET | self.CDONE | self.CS, self.CRESET | self.CS)
-		self._gpio_out = 0
-		self._set_gpio_out(True, True)
+		# self._spi_ctrl.configure("ftdi://::{}/1".format(self._serial_number), frequency=6e6)
+		# self._spi = self._spi_ctrl.get_port(0, mode=2)
+		# self._spi_ctrl._write_raw(self._spi_ctrl._spi_mask | self.CRESET | self.CS, False)
+		# self._spi_gpio = self._spi_ctrl.get_gpio()
+		# self._spi_gpio.set_direction(self.CRESET | self.CDONE | self.CS, self.CRESET | self.CS)
+		# self._gpio_out = 0
+		# self._set_gpio_out(True, True)
+		self._direction = self.SCK|self.MOSI|self.CS|self.CRESET
+		self._mpsse_dev = Ftdi()
+		self._mpsse_dev.open_mpsse_from_url(
+			"ftdi://::{}/1".format(self._serial_number),
+			direction=self._direction,
+			initial=self._direction,
+			frequency=6e6
+		)
 	
 	@property
 	def uart(self):
@@ -73,32 +86,40 @@ class FPGABoard:
 		
 		self._log.debug("CDONE: {}".format("high" if self._get_cdone() else "low"))
 		
+		# creset to low
 		# chip select to low to trigger configuration as SPI peripheral
-		#self._spi.read(0, False, False)
-		self._set_gpio_out(False, False)
-		self._spi.flush()
+		self._set_gpio_out(self.SCK|self.MOSI)
 		
 		self.usleep(100)
 		
-		self._set_gpio_out(False, True)
-		self._spi.flush()
+		self._set_gpio_out(self.SCK|self.MOSI|self.CRESET)
 		
 		# wait for FPGA to clear it's internal configuration memory
 		# at least 1200 us
-		self.usleep(2000)
+		self.usleep(1200)
+		
+		cmd = bytes((
+			Ftdi.SET_BITS_LOW, self.MOSI|self.CS|self.CRESET, self._direction, # chip select high
+			Ftdi.CLK_BITS_NO_DATA, 0x07, # 8 dummy clocks
+			Ftdi.SET_BITS_LOW, self.MOSI|self.CRESET, self._direction # chip select low
+		))
+		self._mpsse_dev.write_data(cmd)
 		
 		# send bitstream
 		chunk_size = 4096
 		for i in range(0, len(bitstream), chunk_size):
-			self._spi.write(bitstream[i:i+chunk_size], False, False)
+			data = bitstream[i:i+chunk_size]
+			cmd = bytearray(Ftdi.WRITE_BYTES_NVE_MSB)
+			cmd.append(len(data) & 0xff)
+			cmd.append(len(data) >> 8)
+			self._mpsse_dev.write_data(cmd)
 		
 		# chip select to high
-		#self._spi.read(0, False, True)
-		self._set_gpio_out(True, True)
+		self._set_gpio_out(self.MOSI|self.CS|self.CRESET)
 		
 		# wait 100 SPI clock cycles for CDONE to go high
-		self._spi.write(bytes([0x00]*13), False, False)
-		self._spi.flush()
+		cmd = bytes((Ftdi.CLK_BYTES_NO_DATA, 0x0b, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x03))
+		self._mpsse_dev.write_data(cmd)
 		
 		# check CDONE
 		if self._get_cdone():
@@ -107,31 +128,20 @@ class FPGABoard:
 			raise Exception("Programming failed")
 		
 		# wait at least 49 SPI clock cycles
-		self._spi.write(bytes([0x00]*7), False, False)
-		self._spi.flush()
+		cmd = bytes((Ftdi.CLK_BYTES_NO_DATA, 0x05, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x00))
+		self._mpsse_dev.write_data(cmd)
+		
 		
 		# SPI pins now also available as user IO (from the FPGA perspective), but they are not used
 	
-	def _set_gpio_out(self, cs=True, creset=True):
-		"""set select and reset
-		
-		set both outputs at the same time since the python interface is too slow to set them with two function calls
-		"""
-		
-		if cs:
-			self._gpio_out |= self.CS
-		else:
-			self._gpio_out &= 0xffff ^ self.CS
-		
-		if creset:
-			self._gpio_out |= self.CRESET
-		else:
-			self._gpio_out &= 0xffff ^ self.CRESET
-		
-		self._spi_gpio.write(self._gpio_out)
+	def _set_gpio_out(self, value):
+		cmd = bytes((Ftdi.SET_BITS_LOW, value, self._direction))
+		self._mpsse_dev.write_data(cmd)
 	
 	def _get_cdone(self):
-		gpio = self._spi_gpio.read()
+		cmd = bytes((Ftdi.GET_BITS_LOW, Ftdi.SEND_IMMEDIATE))
+		self._mpsse_dev.write_data(cmd)
+		gpio = self._mpsse_dev.read_data_bytes(1, 4)[0]
 		return (gpio & self.CDONE) != 0
 	
 	@classmethod
