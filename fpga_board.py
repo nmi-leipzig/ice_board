@@ -66,8 +66,8 @@ class FPGABoard:
 		self._uart.close()
 	
 	def flash_bitstream(self, bitstream_path):
-		self._flash_bitstream_iceprog(bitstream_path)
-		#self._flash_bitstream_spi(bitstream_path)
+		#self._flash_bitstream_iceprog(bitstream_path)
+		self._flash_bitstream_spi(bitstream_path)
 	
 	def _flash_bitstream_iceprog(self, bitstream_path):
 		vid = self._uart.udev.usb_dev.idVendor
@@ -98,27 +98,30 @@ class FPGABoard:
 		# at least 1200 us
 		self.usleep(1200)
 		
-		cmd = bytes((
+		# construct flashing as single command
+		cmd = bytearray((
 			Ftdi.SET_BITS_LOW, self.MOSI|self.CS|self.CRESET, self._direction, # chip select high
 			Ftdi.CLK_BITS_NO_DATA, 0x07, # 8 dummy clocks
 			Ftdi.SET_BITS_LOW, self.MOSI|self.CRESET, self._direction # chip select low
 		))
-		self._mpsse_dev.write_data(cmd)
 		
 		# send bitstream
 		chunk_size = 4096
 		for i in range(0, len(bitstream), chunk_size):
 			data = bitstream[i:i+chunk_size]
-			cmd = bytearray(Ftdi.WRITE_BYTES_NVE_MSB)
-			cmd.append(len(data) & 0xff)
-			cmd.append(len(data) >> 8)
-			self._mpsse_dev.write_data(cmd)
+			cmd.append(Ftdi.WRITE_BYTES_NVE_MSB)
+			len_data = len(data) - 1
+			cmd.append(len_data & 0xff)
+			cmd.append(len_data >> 8)
+			cmd.extend(data)
+		
 		
 		# chip select to high
-		self._set_gpio_out(self.MOSI|self.CS|self.CRESET)
+		self._extend_by_gpio(cmd, self.MOSI|self.CS|self.CRESET)
 		
 		# wait 100 SPI clock cycles for CDONE to go high
-		cmd = bytes((Ftdi.CLK_BYTES_NO_DATA, 0x0b, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x03))
+		cmd.extend((Ftdi.CLK_BYTES_NO_DATA, 0x0b, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x03))
+		
 		self._mpsse_dev.write_data(cmd)
 		
 		# check CDONE
@@ -128,15 +131,19 @@ class FPGABoard:
 			raise Exception("Programming failed")
 		
 		# wait at least 49 SPI clock cycles
-		cmd = bytes((Ftdi.CLK_BYTES_NO_DATA, 0x05, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x00))
+		cmd = bytearray((Ftdi.CLK_BYTES_NO_DATA, 0x05, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x00))
+		self._extend_by_gpio(cmd, self._direction)
 		self._mpsse_dev.write_data(cmd)
-		
 		
 		# SPI pins now also available as user IO (from the FPGA perspective), but they are not used
 	
 	def _set_gpio_out(self, value):
-		cmd = bytes((Ftdi.SET_BITS_LOW, value, self._direction))
+		cmd = bytearray()
+		self._extend_by_gpio(cmd, value)
 		self._mpsse_dev.write_data(cmd)
+	
+	def _extend_by_gpio(self, cmd, value):
+		cmd.extend((Ftdi.SET_BITS_LOW, value, self._direction))
 	
 	def _get_cdone(self):
 		cmd = bytes((Ftdi.GET_BITS_LOW, Ftdi.SEND_IMMEDIATE))
