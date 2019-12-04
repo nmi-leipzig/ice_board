@@ -66,8 +66,8 @@ class FPGABoard:
 		self._uart.close()
 	
 	def flash_bitstream(self, bitstream_path):
-		#self._flash_bitstream_iceprog(bitstream_path)
-		self._flash_bitstream_spi(bitstream_path)
+		self._flash_bitstream_iceprog(bitstream_path)
+		#self._flash_bitstream_spi(bitstream_path)
 	
 	def _flash_bitstream_iceprog(self, bitstream_path):
 		vid = self._uart.udev.usb_dev.idVendor
