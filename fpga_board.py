@@ -13,6 +13,8 @@ import time
 sys.path.append("/usr/local/bin")
 import icebox
 
+class ConfigurationError(Exception):
+	pass
 
 class FPGABoard:
 	
@@ -128,7 +130,7 @@ class FPGABoard:
 		if self._get_cdone():
 			self._log.debug("CDONE: high, programming successful")
 		else:
-			raise Exception("Programming failed")
+			raise ConfigurationError("Programming failed")
 		
 		# wait at least 49 SPI clock cycles
 		cmd = bytearray((Ftdi.CLK_BYTES_NO_DATA, 0x05, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x00))
