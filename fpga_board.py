@@ -66,6 +66,7 @@ class FPGABoard:
 	
 	def __exit__(self, exc_type, exc_value, traceback):
 		self._uart.close()
+		self._mpsse_dev.close()
 	
 	def flash_bitstream(self, bitstream_path):
 		#self._flash_bitstream_iceprog(bitstream_path)
