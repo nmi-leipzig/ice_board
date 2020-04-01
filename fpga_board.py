@@ -52,6 +52,10 @@ class FPGABoard:
 			initial=self._direction,
 			frequency=6e6
 		)
+		self._is_open = True
+	
+	def __del__(self):
+		self._close()
 	
 	@property
 	def uart(self):
@@ -61,12 +65,19 @@ class FPGABoard:
 	def serial_number(self):
 		return self._serial_number
 	
+	def _close(self):
+		if not self._is_open:
+			return
+		
+		self._uart.close()
+		self._mpsse_dev.close()
+		self._is_open = False
+	
 	def __enter__(self):
 		return self
 	
 	def __exit__(self, exc_type, exc_value, traceback):
-		self._uart.close()
-		self._mpsse_dev.close()
+		self._close()
 	
 	def flash_bitstream(self, bitstream_path):
 		#self._flash_bitstream_iceprog(bitstream_path)
