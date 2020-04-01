@@ -2,7 +2,6 @@
 
 from pyftdi.ftdi import Ftdi
 import pyftdi.serialext
-from pyftdi.spi import SpiController
 from serial_utils import is_valid_serial_number
 import signal
 import sys
@@ -21,6 +20,7 @@ class FPGABoard:
 	SCK = 1 # ADBUS0
 	MOSI = 1 << 1 # ADBUS1
 	MISO = 1 << 2 # ADBUS2
+	# there is only one cs connected, but it is ADBUS4, not ADBUS3
 	CS = 1 << 4 # ADBUS4
 	CDONE = 1 << 6 # ADBUS6
 	CRESET = 1 << 7 # ADBUS7
@@ -33,17 +33,6 @@ class FPGABoard:
 			baudrate=baudrate,
 			timeout=timeout
 		)
-		# there is only one cs connected, but it is ADBUS4, not ADBUS3
-		# since ADBUS3 is not used, simply configure two cs' but only use the second one
-		#self._spi_ctrl = SpiController(cs_count=1)
-		# latency=1
-		# self._spi_ctrl.configure("ftdi://::{}/1".format(self._serial_number), frequency=6e6)
-		# self._spi = self._spi_ctrl.get_port(0, mode=2)
-		# self._spi_ctrl._write_raw(self._spi_ctrl._spi_mask | self.CRESET | self.CS, False)
-		# self._spi_gpio = self._spi_ctrl.get_gpio()
-		# self._spi_gpio.set_direction(self.CRESET | self.CDONE | self.CS, self.CRESET | self.CS)
-		# self._gpio_out = 0
-		# self._set_gpio_out(True, True)
 		self._direction = self.SCK|self.MOSI|self.CS|self.CRESET
 		self._mpsse_dev = Ftdi()
 		self._mpsse_dev.open_mpsse_from_url(
