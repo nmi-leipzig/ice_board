@@ -28,6 +28,7 @@ class FPGABoard:
 	def __init__(self, serial_number, baudrate=3000000, timeout=0.5):
 		self._log = logging.getLogger(type(self).__name__)
 		self._serial_number = serial_number
+		self._is_open = False
 		self._uart = pyftdi.serialext.serial_for_url(
 			"ftdi://::{}/2".format(self._serial_number),
 			baudrate=baudrate,
@@ -35,6 +36,7 @@ class FPGABoard:
 		)
 		self._direction = self.SCK|self.MOSI|self.CS|self.CRESET
 		self._mpsse_dev = Ftdi()
+		self._mpsse_dev.log.setLevel(logging.DEBUG)
 		self._mpsse_dev.open_mpsse_from_url(
 			"ftdi://::{}/1".format(self._serial_number),
 			direction=self._direction,
@@ -42,9 +44,6 @@ class FPGABoard:
 			frequency=6e6
 		)
 		self._is_open = True
-	
-	def __del__(self):
-		self._close()
 	
 	@property
 	def uart(self):
@@ -54,10 +53,13 @@ class FPGABoard:
 	def serial_number(self):
 		return self._serial_number
 	
+	def close(self):
+		self._close()
+	
 	def _close(self):
 		if not self._is_open:
 			return
-		
+		print("close {}".format(self.serial_number))
 		self._uart.close()
 		self._mpsse_dev.close()
 		self._is_open = False
@@ -125,8 +127,11 @@ class FPGABoard:
 		# wait 100 SPI clock cycles for CDONE to go high
 		cmd.extend((Ftdi.CLK_BYTES_NO_DATA, 0x0b, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x03))
 		
-		self._mpsse_dev.write_data(cmd)
+		self._log.debug("Write flash command")
+		o = self._mpsse_dev.write_data(cmd)
+		#self._log.debug("flash offset: {}".format(o))
 		
+		self._log.debug("Check success of flash")
 		# check CDONE
 		if self._get_cdone():
 			self._log.debug("CDONE: high, programming successful")
