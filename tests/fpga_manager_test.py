@@ -21,7 +21,7 @@ sys.path.append(
 )
 
 import fpga_manager
-from fpga_manager import get_fpga_manager
+from fpga_manager import get_fpga_board
 from serial_utils import is_valid_serial_number
 
 class FPGAManagerTest(Test):
@@ -188,7 +188,7 @@ class FPGAManagerTest(Test):
 			print(s)
 
 def max_true(individual):
-	with get_fpga_manager().acquire_board() as fpga_board:
+	with get_fpga_board() as fpga_board:
 		print("Board in eval: {} {}".format(fpga_board.serial_number, hex(id(fpga_board))))
 		fpga_board.flash_bitstream("fpga_manager_test.py.data/sum_fpga/sum_fpga_Implmnt/sbt/outputs/bitmap/sum_fpga_top_bitmap.bin")
 		print("send individual")

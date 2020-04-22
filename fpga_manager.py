@@ -132,20 +132,20 @@ class FPGAManager:
 			process_count = len(self._available)
 		
 		# more than one board in more than one process cause an segfault in libusb
-		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_manager, initargs=(self,))
+		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
 		
 		return pool
 
-def set_global_fpga_manager(fm):
-	global gl_fpga_manager
-	gl_fpga_manager = fm
-	print("global FPGA manager set: {} {}".format(gl_fpga_manager._avail_dict, gl_fpga_manager))
+def set_global_fpga_board(fm):
+	global gl_fpga_board
+	gl_fpga_board = fm.acquire_board()
+	print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
 
 def print_fpga_manager():
 	print(hex(id(gl_fpga_manager)), end=" ")
 
-def get_fpga_manager():
-	return gl_fpga_manager
+def get_fpga_board():
+	return gl_fpga_board
 
 class ManagedFPGABoard(FPGABoard):
 	"""FPGABoard that is managed by an external instance.
@@ -158,7 +158,8 @@ class ManagedFPGABoard(FPGABoard):
 	
 	def __exit__(self, exc_type, exc_value, traceback):
 		# leave connections open even if context is left
-		self._fpga_manager.release_board(self)
+		#self._fpga_manager.release_board(self)
+		pass
 	
 	def close(self):
 		self._close()
