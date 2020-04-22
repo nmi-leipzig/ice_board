@@ -126,12 +126,13 @@ class FPGAManager:
 		self._available.add(board.serial_number)
 		self._avail_dict[board.serial_number] = True
 	
-	def generate_pool(self):
-		#TODO: optional parameter for pool size
+	def generate_pool(self, process_count=None):
+		# optional parameter for pool size
+		if process_count is None:
+			process_count = len(self._available)
 		
-		pool = multiprocessing.Pool(len(self._available), initializer=set_global_fpga_manager, initargs=(self,))
 		# more than one board in more than one process cause an segfault in libusb
-		#pool = multiprocessing.Pool(1, initializer=set_global_fpga_manager, initargs=(self,))
+		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_manager, initargs=(self,))
 		
 		return pool
 
