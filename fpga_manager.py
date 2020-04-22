@@ -36,7 +36,10 @@ class FPGAManager:
 		if len(sn_set) != len(serial_numbers):
 			raise ValueError("Some serial number requested multiple times")
 		
-		self._boards = {}
+		self._baudrate = baudrate
+		self._timeout = timeout
+		
+		#self._boards = {}
 		self._manager = multiprocessing.Manager()
 		self._avail_dict = self._manager.dict()
 		self._acquire_lock = self._manager.Lock()
@@ -68,56 +71,59 @@ class FPGAManager:
 						continue
 				add_count -= 1
 			
-			new_board = ManagedFPGABoard(self, desc.sn, baudrate, timeout)
-			self._add_board(new_board)
+			#new_board = ManagedFPGABoard(self, desc.sn, baudrate, timeout)
+			#self._add_board(new_board)
+			self._avail_dict[desc.sn] = True
 		
 		# check if all requested serial numbers were found
 		if len(sn_set) > 0:
 			self._close_boards()
 			raise OSError(errno.ENXIO, "Couldn't open {} requested boards: {}".format(len(sn_set), sn_set))
 		
-		if len(self._boards) < min_nr:
-			avail = len(self._boards)
+		if len(self._avail_dict) < min_nr:
+			avail = len(self._avail_dict)
 			self._close_boards()
 			raise OSError(errno.ENXIO, "Minimum of {} boards requested, only {} available".format(min_nr, avail))
 		
-		print(self._boards)
 	
-	def _add_board(self, board):
-		if board.serial_number in self._boards:
-			raise ValueError("Board {} added multiple times".format(board.serial_number))
-		self._boards[board.serial_number] = board
-		self._avail_dict[board.serial_number] = True
+	#def _add_board(self, board):
+	#	if board.serial_number in self._boards:
+	#		raise ValueError("Board {} added multiple times".format(board.serial_number))
+	#	self._boards[board.serial_number] = board
+	#	self._avail_dict[board.serial_number] = True
 	
 	def close(self):
 		self._close_boards()
 	
 	def _close_boards(self):
-		for sn in list(self._boards):
+		for sn in list(self._avail_dict):
 			self._avail_dict.pop(sn)
-			board = self._boards.pop(sn)
-			board.close()
+			#board = self._boards.pop(sn)
+			#board.close()
 	
 	def __len__(self):
-		return len(self._boards)
+		return len(self._avail_dict)
 	
 	def acquire_board(self, serial_number=None):
 		with self._acquire_lock:
 			if serial_number is None:
-				sn_rand = list(self._boards)
-				random.shuffle(sn_rand)
-				for sn in sn_rand:
-					if self._avail_dict[sn]:
-						serial_number = sn
-						break
+				#sn_rand = list(#self._boards)
+				#random.shuffle(sn_rand)
+				#for sn in sn_rand:
+				#	if self._avail_dict[sn]:
+				#		serial_number = sn
+				#		break
+				sn_avail = [sn for sn, a in self._avail_dict.items() if a]
+				serial_number = random.choice(sn_avail)
 			
 			print("acquire {}".format(serial_number))
 			self._avail_dict[serial_number] = False
 			
-			return self._boards[serial_number]
+			#return self._boards[serial_number]
+			return ManagedFPGABoard(self, serial_number, self._baudrate, self._timeout)
 	
 	def release_board(self, board):
-		if board.serial_number not in self._boards:
+		if board.serial_number not in self._avail_dict:
 			raise ValueError("Can't release board {}; not managed here".format(board.serial_number))
 		
 		self._avail_dict[board.serial_number] = True
@@ -135,7 +141,7 @@ class FPGAManager:
 def set_global_fpga_board(fm):
 	global gl_fpga_board
 	gl_fpga_board = fm.acquire_board()
-	print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
+	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
 
 def print_fpga_manager():
 	print(hex(id(gl_fpga_manager)), end=" ")
