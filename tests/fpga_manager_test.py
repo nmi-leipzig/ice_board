@@ -8,6 +8,7 @@ import random
 import logging
 
 from avocado import Test
+import avocado
 from pyftdi.usbtools import UsbDeviceDescriptor
 from deap import tools
 from deap import creator
@@ -77,8 +78,10 @@ class FPGAManagerTest(Test):
 		timeout = 8.1
 		
 		created_sn_list = []
-		def add_created(serial_number, baudrate, timeout):
+		def add_created(s, fm, serial_number, baudrate, timeout):
 			created_sn_list.append(serial_number)
+			s._serial_number = serial_number
+			s._is_open = False
 			return None
 		
 		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: dev_list), mock.patch("fpga_manager_test.fpga_manager.ManagedFPGABoard.__init__", autospec=True, side_effect=add_created) as mock_init:
@@ -164,6 +167,7 @@ class FPGAManagerTest(Test):
 		pop = toolbox.init_pop(n=10)
 		algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
+	@avocado.skip("broken DUT")
 	def test_multi(self):
 		toolbox = create_toolbox()
 		
@@ -178,6 +182,7 @@ class FPGAManagerTest(Test):
 		pool.close()
 		fm.close()
 	
+	@avocado.skip("broken DUT")
 	def test_tmp(self):
 		from fpga_board import FPGABoard
 		
