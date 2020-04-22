@@ -77,7 +77,9 @@ class FPGAManager:
 			raise OSError(errno.ENXIO, "Couldn't open {} requested boards: {}".format(len(sn_set), sn_set))
 		
 		if len(self._boards) < min_nr:
+			avail = len(self._boards)
 			self._close_boards()
+			raise OSError(errno.ENXIO, "Minimum of {} boards requested, only {} available".format(min_nr, avail))
 		
 		print(self._boards)
 	
