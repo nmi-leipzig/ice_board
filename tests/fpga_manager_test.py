@@ -5,6 +5,7 @@ import sys
 from array import array
 import unittest.mock as mock
 import random
+import logging
 
 from avocado import Test
 from pyftdi.usbtools import UsbDeviceDescriptor
@@ -159,39 +160,22 @@ class FPGAManagerTest(Test):
 		red_dev_list = list(map(lambda e: (e[0], 1) if e[0].sn==sn_list[1] else e, dev_list))
 		self.generic_creation_error_test(OSError, red_dev_list, 1, 0, sn_list[:3])
 	
-	def create_toolbox(self):
-		
-		creator.create("TestFit", base.Fitness, weights=(1.0,))
-		creator.create("Chromo", list, fitness=creator.TestFit)
-		
-		toolbox = base.Toolbox()
-		
-		toolbox.register("rand_bool", random.randint, 0, 1)
-		toolbox.register("init_individual", tools.initRepeat, creator.Chromo, toolbox.rand_bool, 20)
-		toolbox.register("init_pop", tools.initRepeat, list, toolbox.init_individual)
-		
-		toolbox.register("mate", tools.cxTwoPoint)
-		toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
-		toolbox.register("select", tools.selTournament, tournsize=3)
-		
-		return toolbox
-	
 	def run_ga(self, toolbox):
 		pop = toolbox.init_pop(n=10)
 		algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
 	def test_multi(self):
-		toolbox = self.create_toolbox()
+		toolbox = create_toolbox()
 		
 		fm = fpga_manager.FPGAManager()
 		pool = fm.generate_pool()
 		toolbox.register("map", pool.map)
 		
-		
 		toolbox.register("evaluate", max_true)
 		
 		self.run_ga(toolbox)
 		
+		pool.close()
 		fm.close()
 	
 	def test_tmp(self):
@@ -216,3 +200,43 @@ def max_true(individual):
 	#print("FM in eval: {}".format(get_fpga_manager()))
 	#s = sum(individual)
 	return (s, )
+
+def create_toolbox():
+	
+	creator.create("TestFit", base.Fitness, weights=(1.0,))
+	creator.create("Chromo", list, fitness=creator.TestFit)
+	
+	toolbox = base.Toolbox()
+	
+	toolbox.register("rand_bool", random.randint, 0, 1)
+	toolbox.register("init_individual", tools.initRepeat, creator.Chromo, toolbox.rand_bool, 20)
+	toolbox.register("init_pop", tools.initRepeat, list, toolbox.init_individual)
+	
+	toolbox.register("mate", tools.cxTwoPoint)
+	toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+	toolbox.register("select", tools.selTournament, tournsize=3)
+	
+	return toolbox
+
+
+if __name__ == "__main__":
+	os.environ["LIBUSB_DEBUG"] = "4"
+	logging.basicConfig(level=logging.DEBUG)
+	
+	toolbox = create_toolbox()
+	toolbox.register("evaluate", max_true)
+	
+	random.seed(64)
+	
+	fm = fpga_manager.FPGAManager()
+	pool = fm.generate_pool()
+	toolbox.register("map", pool.map)
+	
+	pop = toolbox.init_pop(n=5)
+	
+	input("go on?")
+	
+	algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
+	
+	pool.close()
+	fm.close()
