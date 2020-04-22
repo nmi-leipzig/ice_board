@@ -37,7 +37,6 @@ class FPGAManager:
 			raise ValueError("Some serial number requested multiple times")
 		
 		self._boards = {}
-		self._available = set()
 		self._manager = multiprocessing.Manager()
 		self._avail_dict = self._manager.dict()
 		self._acquire_lock = self._manager.Lock()
@@ -80,14 +79,12 @@ class FPGAManager:
 		if len(self._boards) < min_nr:
 			self._close_boards()
 		
-		print(self._available)
 		print(self._boards)
 	
 	def _add_board(self, board):
 		if board.serial_number in self._boards:
 			raise ValueError("Board {} added multiple times".format(board.serial_number))
 		self._boards[board.serial_number] = board
-		self._available.add(board.serial_number)
 		self._avail_dict[board.serial_number] = True
 	
 	def close(self):
@@ -95,7 +92,6 @@ class FPGAManager:
 	
 	def _close_boards(self):
 		for sn in list(self._boards):
-			self._available.discard(sn)
 			self._avail_dict.pop(sn)
 			board = self._boards.pop(sn)
 			board.close()
@@ -113,7 +109,6 @@ class FPGAManager:
 						serial_number = sn
 						break
 			
-			self._available.remove(serial_number)
 			print("acquire {}".format(serial_number))
 			self._avail_dict[serial_number] = False
 			
@@ -123,13 +118,12 @@ class FPGAManager:
 		if board.serial_number not in self._boards:
 			raise ValueError("Can't release board {}; not managed here".format(board.serial_number))
 		
-		self._available.add(board.serial_number)
 		self._avail_dict[board.serial_number] = True
 	
 	def generate_pool(self, process_count=None):
 		# optional parameter for pool size
 		if process_count is None:
-			process_count = len(self._available)
+			process_count = sum(self._avail_dict.values())
 		
 		# more than one board in more than one process cause an segfault in libusb
 		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
