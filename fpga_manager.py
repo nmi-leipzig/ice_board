@@ -40,6 +40,11 @@ class FPGAManager:
 		self._timeout = timeout
 		
 		#self._boards = {}
+		try:
+			multiprocessing.set_start_method('spawn')
+		except RuntimeError:
+			# context has already been set
+			pass
 		self._manager = multiprocessing.Manager()
 		self._avail_dict = self._manager.dict()
 		self._acquire_lock = self._manager.Lock()
@@ -120,7 +125,7 @@ class FPGAManager:
 			self._avail_dict[serial_number] = False
 			
 			#return self._boards[serial_number]
-			return ManagedFPGABoard(self, serial_number, self._baudrate, self._timeout)
+			return ManagedFPGABoard(serial_number, self._baudrate, self._timeout)
 	
 	def release_board(self, board):
 		if board.serial_number not in self._avail_dict:
@@ -134,13 +139,26 @@ class FPGAManager:
 			process_count = sum(self._avail_dict.values())
 		
 		# more than one board in more than one process cause an segfault in libusb
-		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
+		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
+		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self._avail_dict, self._acquire_lock))
 		
 		return pool
 
 def set_global_fpga_board(fm):
 	global gl_fpga_board
 	gl_fpga_board = fm.acquire_board()
+	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
+
+def set_global_fpga_board_from_dict(avail_dict, avail_lock):
+	global gl_fpga_board
+	with avail_lock:
+		sn_avail = [sn for sn, a in avail_dict.items() if a]
+		serial_number = random.choice(sn_avail)
+		
+		print("take {}".format(serial_number))
+		avail_dict[serial_number] = False
+		
+		gl_fpga_board = ManagedFPGABoard(serial_number)
 	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
 
 def print_fpga_manager():
@@ -154,9 +172,9 @@ class ManagedFPGABoard(FPGABoard):
 	
 	managed means created and closed
 	"""
-	def __init__(self, fpga_manager, serial_number, baudrate=3000000, timeout=0.5):
+	def __init__(self, serial_number, baudrate=3000000, timeout=0.5):
 		super().__init__(serial_number, baudrate, timeout)
-		self._fpga_manager = fpga_manager
+		#self._fpga_manager = fpga_manager
 	
 	def __exit__(self, exc_type, exc_value, traceback):
 		# leave connections open even if context is left

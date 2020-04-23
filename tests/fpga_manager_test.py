@@ -206,10 +206,10 @@ def max_true(individual):
 	#s = sum(individual)
 	return (s, )
 
+creator.create("TestFit", base.Fitness, weights=(1.0,))
+creator.create("Chromo", list, fitness=creator.TestFit)
+
 def create_toolbox():
-	
-	creator.create("TestFit", base.Fitness, weights=(1.0,))
-	creator.create("Chromo", list, fitness=creator.TestFit)
 	
 	toolbox = base.Toolbox()
 	
@@ -225,8 +225,9 @@ def create_toolbox():
 
 
 if __name__ == "__main__":
-	os.environ["LIBUSB_DEBUG"] = "4"
+	#os.environ["LIBUSB_DEBUG"] = "4"
 	logging.basicConfig(level=logging.DEBUG)
+	
 	
 	toolbox = create_toolbox()
 	toolbox.register("evaluate", max_true)
@@ -240,7 +241,7 @@ if __name__ == "__main__":
 	
 	pop = toolbox.init_pop(n=5)
 	
-	input("go on?")
+	#input("go on?")
 	
 	algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
