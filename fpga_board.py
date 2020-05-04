@@ -36,7 +36,7 @@ class FPGABoard:
 		)
 		self._direction = self.SCK|self.MOSI|self.CS|self.CRESET
 		self._mpsse_dev = Ftdi()
-		self._mpsse_dev.log.setLevel(logging.DEBUG)
+		#self._mpsse_dev.log.setLevel(logging.DEBUG)
 		self._mpsse_dev.open_mpsse_from_url(
 			"ftdi://::{}/1".format(self._serial_number),
 			direction=self._direction,
@@ -59,7 +59,7 @@ class FPGABoard:
 	def _close(self):
 		if not self._is_open:
 			return
-		print("close {}".format(self.serial_number))
+		
 		self._uart.close()
 		self._mpsse_dev.close()
 		self._is_open = False
