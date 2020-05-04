@@ -65,6 +65,7 @@ class FPGABoard:
 		self._is_open = False
 	
 	def __enter__(self):
+		self._uart.reset_input_buffer()
 		return self
 	
 	def __exit__(self, exc_type, exc_value, traceback):
