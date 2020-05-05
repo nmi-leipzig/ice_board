@@ -10,7 +10,7 @@ from fpga_board import FPGABoard
 from serial_utils import check_serial_number, is_valid_serial_number, MalformedSerial
 
 class FPGAManager:
-	def __init__(self, min_nr=1, max_nr=0, serial_numbers=[], baudrate=3000000, timeout=0.5):
+	def __init__(self, mp_manager, min_nr=1, max_nr=0, serial_numbers=[], baudrate=3000000, timeout=0.5):
 		"""
 		min_nr: minimum number of managed boards
 		max_nr maximum number of managed boards
@@ -40,14 +40,8 @@ class FPGAManager:
 		self._timeout = timeout
 		
 		#self._boards = {}
-		try:
-			multiprocessing.set_start_method('spawn')
-		except RuntimeError:
-			# context has already been set
-			pass
-		self._manager = multiprocessing.Manager()
-		self._avail_dict = self._manager.dict()
-		self._acquire_lock = self._manager.Lock()
+		self._avail_dict = mp_manager.dict()
+		self._acquire_lock = mp_manager.Lock()
 		
 		# get list of all available boards
 		ft2232_devices = Ftdi.find_all([(0x0403, 0x6010)], True)
@@ -125,7 +119,7 @@ class FPGAManager:
 			self._avail_dict[serial_number] = False
 			
 			#return self._boards[serial_number]
-			return ManagedFPGABoard(serial_number, self._baudrate, self._timeout)
+			return ManagedFPGABoard(self, serial_number, self._baudrate, self._timeout)
 	
 	def release_board(self, board):
 		if board.serial_number not in self._avail_dict:
@@ -139,17 +133,31 @@ class FPGAManager:
 			process_count = sum(self._avail_dict.values())
 		
 		# more than one board in more than one process cause an segfault in libusb
-		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
-		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self._avail_dict, self._acquire_lock))
+		# -> create board in initializer
+		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
+		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self, self._avail_dict, self._acquire_lock))
 		
 		return pool
+	
+	@classmethod
+	def create_manager(cls, min_nr=1, max_nr=0, serial_numbers=[], baudrate=3000000, timeout=0.5):
+		try:
+			multiprocessing.set_start_method('spawn')
+		except RuntimeError:
+			# context has already been set
+			pass
+		
+		mp_manager = multiprocessing.Manager()
+		fpga_manager = cls(mp_manager, min_nr, max_nr, serial_numbers, baudrate, timeout)
+		
+		return fpga_manager
 
 def set_global_fpga_board(fm):
 	global gl_fpga_board
 	gl_fpga_board = fm.acquire_board()
 	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
 
-def set_global_fpga_board_from_dict(avail_dict, avail_lock):
+def set_global_fpga_board_from_dict(fpga_manager, avail_dict, avail_lock):
 	global gl_fpga_board
 	with avail_lock:
 		sn_avail = [sn for sn, a in avail_dict.items() if a]
@@ -158,7 +166,7 @@ def set_global_fpga_board_from_dict(avail_dict, avail_lock):
 		print("take {}".format(serial_number))
 		avail_dict[serial_number] = False
 		
-		gl_fpga_board = ManagedFPGABoard(serial_number)
+		gl_fpga_board = ManagedFPGABoard(fpga_manager, serial_number)
 	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
 
 def print_fpga_manager():
@@ -172,14 +180,14 @@ class ManagedFPGABoard(FPGABoard):
 	
 	managed means created and closed
 	"""
-	def __init__(self, serial_number, baudrate=3000000, timeout=0.5):
+	def __init__(self, fpga_manager, serial_number, baudrate=3000000, timeout=0.5):
 		super().__init__(serial_number, baudrate, timeout)
-		#self._fpga_manager = fpga_manager
+		self._fpga_manager = fpga_manager
 	
 	def __exit__(self, exc_type, exc_value, traceback):
 		# leave connections open even if context is left
-		#self._fpga_manager.release_board(self)
 		pass
 	
 	def close(self):
+		self._fpga_manager.release_board(self)
 		self._close()

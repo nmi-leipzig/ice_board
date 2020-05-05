@@ -234,7 +234,7 @@ if __name__ == "__main__":
 	
 	random.seed(64)
 	
-	fm = fpga_manager.FPGAManager()
+	fm = fpga_manager.FPGAManager.create_manager()
 	#pool = fm.generate_pool(1)
 	pool = fm.generate_pool()
 	toolbox.register("map", pool.map)
