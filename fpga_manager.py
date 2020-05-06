@@ -4,6 +4,7 @@ import errno
 import multiprocessing
 from multiprocessing.util import Finalize
 import random
+import logging
 
 from pyftdi.ftdi import Ftdi
 
@@ -16,6 +17,8 @@ class FPGAManager:
 		min_nr: minimum number of managed boards
 		max_nr maximum number of managed boards
 		"""
+		
+		self._log = logging.getLogger(type(self).__name__)
 		
 		# vaidate input
 		if min_nr < 1:
@@ -94,7 +97,7 @@ class FPGAManager:
 	#	self._avail_dict[board.serial_number] = True
 	
 	def close(self):
-		print("close FPGAManager")
+		self._log.debug("close FPGAManager")
 		self._close_boards()
 	
 	def _close_boards(self):
@@ -120,7 +123,7 @@ class FPGAManager:
 				sn_avail = [sn for sn, a in self._avail_dict.items() if a]
 				serial_number = random.choice(sn_avail)
 			
-			print("acquire {}".format(serial_number))
+			self._log.debug("acquire {}".format(serial_number))
 			self._avail_dict[serial_number] = False
 			
 			#return self._boards[serial_number]
@@ -141,7 +144,7 @@ class FPGAManager:
 		
 		# more than one board in more than one process cause an segfault in libusb
 		# -> create board in initializer
-		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
+		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self, logging.root.level))
 		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self, self._avail_dict, self._avail_lock))
 		
 		return pool
@@ -151,18 +154,20 @@ class FPGAManager:
 		try:
 			multiprocessing.set_start_method('spawn')
 		except RuntimeError:
-			# context has already been set
-			pass
+			self._log.debug("context has already been set")
 		
 		mp_manager = multiprocessing.Manager()
 		fpga_manager = cls(mp_manager, min_nr, max_nr, serial_numbers, baudrate, timeout)
 		
 		return fpga_manager
 
-def set_global_fpga_board(fm):
+def set_global_fpga_board(fm, log_level=None):
+	if log_level is not None:
+		logging.basicConfig(level=log_level)
+	
 	global gl_fpga_board
 	gl_fpga_board = fm.acquire_board()
-	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
+	
 	Finalize(gl_fpga_board, gl_fpga_board.close, exitpriority=19)
 
 def set_global_fpga_board_from_dict(fpga_manager, avail_dict, avail_lock):
@@ -197,11 +202,10 @@ class ManagedFPGABoard(FPGABoard):
 		pass
 	
 	def close(self):
-		print("close {}".format(self.serial_number))
+		self._log.debug("close {}".format(self.serial_number))
 		self._close()
 		try:
 			self._fpga_manager.release_board(self)
 		except ValueError:
 			# _fpga_manager was closed before the board
-			print("FPGAManager closed before board {}".format(self.serial_number))
-			pass
+			self._log.debug("FPGAManager closed before board {}".format(self.serial_number))
