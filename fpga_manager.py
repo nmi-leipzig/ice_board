@@ -2,6 +2,7 @@
 
 import errno
 import multiprocessing
+from multiprocessing.util import Finalize
 import random
 
 from pyftdi.ftdi import Ftdi
@@ -41,7 +42,7 @@ class FPGAManager:
 		
 		#self._boards = {}
 		self._avail_dict = mp_manager.dict()
-		self._acquire_lock = mp_manager.Lock()
+		self._avail_lock = mp_manager.Lock()
 		
 		# get list of all available boards
 		ft2232_devices = Ftdi.find_all([(0x0403, 0x6010)], True)
@@ -55,24 +56,25 @@ class FPGAManager:
 		# should always be non negative after the tests above
 		add_count = max_nr - len(sn_set)
 		
-		for desc, i_count in ft2232_devices:
-			if not is_valid_serial_number(desc.sn) or i_count != 2:
-				continue
-			try:
-				# open the boards with requested serial numbers
-				sn_set.remove(desc.sn)
-			except KeyError:
-				# open additional boards
-				if add_count == 0:
-					if len(sn_set) == 0:
-						break
-					else:
-						continue
-				add_count -= 1
-			
-			#new_board = ManagedFPGABoard(self, desc.sn, baudrate, timeout)
-			#self._add_board(new_board)
-			self._avail_dict[desc.sn] = True
+		with self._avail_lock:
+			for desc, i_count in ft2232_devices:
+				if not is_valid_serial_number(desc.sn) or i_count != 2:
+					continue
+				try:
+					# open the boards with requested serial numbers
+					sn_set.remove(desc.sn)
+				except KeyError:
+					# open additional boards
+					if add_count == 0:
+						if len(sn_set) == 0:
+							break
+						else:
+							continue
+					add_count -= 1
+				
+				#new_board = ManagedFPGABoard(self, desc.sn, baudrate, timeout)
+				#self._add_board(new_board)
+				self._avail_dict[desc.sn] = True
 		
 		# check if all requested serial numbers were found
 		if len(sn_set) > 0:
@@ -92,19 +94,22 @@ class FPGAManager:
 	#	self._avail_dict[board.serial_number] = True
 	
 	def close(self):
+		print("close FPGAManager")
 		self._close_boards()
 	
 	def _close_boards(self):
-		for sn in list(self._avail_dict):
-			self._avail_dict.pop(sn)
-			#board = self._boards.pop(sn)
-			#board.close()
+		with self._avail_lock:
+			for sn in list(self._avail_dict):
+				self._avail_dict.pop(sn)
+				#board = self._boards.pop(sn)
+				#board.close()
 	
 	def __len__(self):
-		return len(self._avail_dict)
+		with self._avail_lock:
+			return len(self._avail_dict)
 	
 	def acquire_board(self, serial_number=None):
-		with self._acquire_lock:
+		with self._avail_lock:
 			if serial_number is None:
 				#sn_rand = list(#self._boards)
 				#random.shuffle(sn_rand)
@@ -122,20 +127,22 @@ class FPGAManager:
 			return ManagedFPGABoard(self, serial_number, self._baudrate, self._timeout)
 	
 	def release_board(self, board):
-		if board.serial_number not in self._avail_dict:
-			raise ValueError("Can't release board {}; not managed here".format(board.serial_number))
-		
-		self._avail_dict[board.serial_number] = True
+		with self._avail_lock:
+			if board.serial_number not in self._avail_dict:
+				raise ValueError("Can't release board {}; not managed here".format(board.serial_number))
+			
+			self._avail_dict[board.serial_number] = True
 	
 	def generate_pool(self, process_count=None):
 		# optional parameter for pool size
 		if process_count is None:
-			process_count = sum(self._avail_dict.values())
+			with self._avail_lock:
+				process_count = sum(self._avail_dict.values())
 		
 		# more than one board in more than one process cause an segfault in libusb
 		# -> create board in initializer
 		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self,))
-		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self, self._avail_dict, self._acquire_lock))
+		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self, self._avail_dict, self._avail_lock))
 		
 		return pool
 	
@@ -156,6 +163,7 @@ def set_global_fpga_board(fm):
 	global gl_fpga_board
 	gl_fpga_board = fm.acquire_board()
 	#print("global FPGA board set: {} {}".format(gl_fpga_board.serial_number, gl_fpga_board))
+	Finalize(gl_fpga_board, gl_fpga_board.close, exitpriority=19)
 
 def set_global_fpga_board_from_dict(fpga_manager, avail_dict, avail_lock):
 	global gl_fpga_board
@@ -189,5 +197,11 @@ class ManagedFPGABoard(FPGABoard):
 		pass
 	
 	def close(self):
-		self._fpga_manager.release_board(self)
+		print("close {}".format(self.serial_number))
 		self._close()
+		try:
+			self._fpga_manager.release_board(self)
+		except ValueError:
+			# _fpga_manager was closed before the board
+			print("FPGAManager closed before board {}".format(self.serial_number))
+			pass
