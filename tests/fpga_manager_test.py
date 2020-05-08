@@ -185,14 +185,14 @@ class FPGAManagerTest(Test):
 
 def max_true(individual):
 	with get_fpga_board() as fpga_board:
-		print("Board in eval: {} {}".format(fpga_board.serial_number, hex(id(fpga_board))))
-		fpga_board.flash_bitstream("fpga_manager_test.py.data/sum_fpga/sum_fpga_Implmnt/sbt/outputs/bitmap/sum_fpga_top_bitmap.bin")
-		print("send individual")
+		#print("Board in eval: {} {}".format(fpga_board.serial_number, hex(id(fpga_board))))
+		fpga_board.flash_bitstream("fpga_manager_test.py.data/sum_fpga.bin")
+		#print("send individual")
 		fpga_board.uart.write(bytes(individual))
-		print("read sum")
+		#print("read sum")
 		raw_data = fpga_board.uart.read(1)
 		s = int.from_bytes(raw_data, 'little')
-		print("{} = sum({})".format(s, individual))
+		#print("{} = sum({})".format(s, individual))
 	#print("FM in eval: {}".format(get_fpga_manager()))
 	#s = sum(individual)
 	return (s, )
