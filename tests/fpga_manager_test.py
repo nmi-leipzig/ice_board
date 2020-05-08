@@ -23,6 +23,7 @@ sys.path.append(
 
 import fpga_manager
 from fpga_manager import get_fpga_board
+from fpga_board import FPGABoard
 from serial_utils import is_valid_serial_number
 
 class FPGAManagerTest(Test):
@@ -162,7 +163,6 @@ class FPGAManagerTest(Test):
 		pop = toolbox.init_pop(n=10)
 		algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
-	#@avocado.skip("broken DUT")
 	def test_multi(self):
 		toolbox = create_toolbox()
 		# add the directory of this file to the path so pickle can find this module when pickling
@@ -178,9 +178,11 @@ class FPGAManagerTest(Test):
 		self.run_ga(toolbox)
 		
 		pool.close()
+		pool.join()
+		
 		fm.close()
 	
-	@avocado.skip("broken DUT")
+	@avocado.skip("to be moved")
 	def test_tmp(self):
 		from fpga_board import FPGABoard
 		
@@ -244,4 +246,6 @@ if __name__ == "__main__":
 	algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
 	pool.close()
+	pool.join()
+	
 	fm.close()
