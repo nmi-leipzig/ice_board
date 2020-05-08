@@ -163,6 +163,7 @@ class FPGAManagerTest(Test):
 		pop = toolbox.init_pop(n=10)
 		algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
+	@avocado.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
 	def test_multi(self):
 		toolbox = create_toolbox()
 		# add the directory of this file to the path so pickle can find this module when pickling
