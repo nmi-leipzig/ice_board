@@ -144,19 +144,17 @@ class FPGAManager:
 		
 		# more than one board in more than one process cause an segfault in libusb
 		# -> create board in initializer
-		pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board, initargs=(self, logging.root.level))
+		context = multiprocessing.get_context('spawn')
+		pool = context.Pool(process_count, initializer=set_global_fpga_board, initargs=(self, logging.root.level))
 		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self, self._avail_dict, self._avail_lock))
 		
 		return pool
 	
 	@classmethod
 	def create_manager(cls, min_nr=1, max_nr=0, serial_numbers=[], baudrate=3000000, timeout=0.5):
-		try:
-			multiprocessing.set_start_method('spawn')
-		except RuntimeError:
-			self._log.debug("context has already been set")
+		context = multiprocessing.get_context('spawn')
 		
-		mp_manager = multiprocessing.Manager()
+		mp_manager = context.Manager()
 		fpga_manager = cls(mp_manager, min_nr, max_nr, serial_numbers, baudrate, timeout)
 		
 		return fpga_manager
