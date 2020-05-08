@@ -136,7 +136,14 @@ class FPGAManager:
 			
 			self._avail_dict[board.serial_number] = True
 	
-	def generate_pool(self, process_count=None):
+	def generate_pool(self, process_count=None, log_level=None):
+		"""Generate multiprocessing.Pool from FPGAManager
+		
+		Each process in the pool has access to an dediacted ManagedFPGABoard by calling get_fpga_board()
+		
+		process_count: the requested number of processes, defaults to number of available boards
+		log_level: log level of the processes
+		"""
 		# optional parameter for pool size
 		if process_count is None:
 			with self._avail_lock:
@@ -145,8 +152,7 @@ class FPGAManager:
 		# more than one board in more than one process cause an segfault in libusb
 		# -> create board in initializer
 		context = multiprocessing.get_context('spawn')
-		pool = context.Pool(process_count, initializer=set_global_fpga_board, initargs=(self, logging.root.level))
-		#pool = multiprocessing.Pool(process_count, initializer=set_global_fpga_board_from_dict, initargs=(self, self._avail_dict, self._avail_lock))
+		pool = context.Pool(process_count, initializer=set_global_fpga_board, initargs=(self, log_level))
 		
 		return pool
 	
