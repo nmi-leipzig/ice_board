@@ -19,6 +19,10 @@ sys.path.append(
 from fpga_board import FPGABoard
 
 class FPGABoardTest(Test):
+	"""
+	:avocado: tags=components,quick
+	"""
+	
 	def setUp(self):
 		self.valid_sn =  "T80000"
 		self.dev_list = [
@@ -49,6 +53,9 @@ class FPGABoardTest(Test):
 	
 	@avocado.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
 	def test_flash_bitstream(self):
+		"""
+		:avocado: tags=hil
+		"""
 		data_length = 10
 		bitstream_path = self.get_data("echo_fpga.bin")
 		with FPGABoard.get_suitable_board() as fpga:

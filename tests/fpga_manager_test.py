@@ -27,6 +27,9 @@ from fpga_board import FPGABoard
 from serial_utils import is_valid_serial_number
 
 class FPGAManagerTest(Test):
+	"""
+	:avocado: tags=components,quick
+	"""
 	
 	def generate_creation_data_set(self, valid, invalid):
 		"""Generate data set for FPGAManger creation
@@ -97,6 +100,9 @@ class FPGAManagerTest(Test):
 			self.generic_creation_test(None, dev_list, min_nr, max_nr, requested_serial_numbers)
 	
 	def test_creation(self):
+		"""
+		:avocado: tags=middle
+		"""
 		dev_list, sn_list = self.generate_creation_data_set(5, 3)
 		
 		# no requested, no upper limit
@@ -127,6 +133,9 @@ class FPGAManagerTest(Test):
 		self.generic_creation_test(sn_list[:3], dev_list, 2, 3, sn_list[:3])
 	
 	def test_creation_input_error(self):
+		"""
+		:avocado: tags=quick
+		"""
 		dev_list, sn_list = self.generate_creation_data_set(5, 3)
 		
 		# too low minimum
@@ -146,6 +155,9 @@ class FPGAManagerTest(Test):
 		self.generic_creation_error_test(ValueError, dev_list, 1, 0, sn_list+invalid_sn[:1])
 	
 	def test_creation_unavailable_error(self):
+		"""
+		:avocado: tags=quick
+		"""
 		dev_list, sn_list = self.generate_creation_data_set(5, 3)
 		
 		# minimum not reached
@@ -165,6 +177,9 @@ class FPGAManagerTest(Test):
 	
 	@avocado.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
 	def test_multi(self):
+		"""
+		:avocado: tags=hil,middle
+		"""
 		toolbox = create_toolbox()
 		# add the directory of this file to the path so pickle can find this module when pickling
 		# necessary for execution with avocado
@@ -227,7 +242,7 @@ if __name__ == "__main__":
 	
 	fm = fpga_manager.FPGAManager.create_manager()
 	#pool = fm.generate_pool(1)
-	pool = fm.generate_pool()
+	pool = fm.generate_pool(log_level=logging.root.level)
 	toolbox.register("map", pool.map)
 	
 	pop = toolbox.init_pop(n=5)

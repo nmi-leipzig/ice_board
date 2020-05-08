@@ -16,6 +16,9 @@ sys.path.append(
 from serial_writer import SerialWriter
 
 class SerialWriterTest(Test):
+	"""
+	:avocado: tags=components,quick
+	"""
 	
 	def setUp(self):
 		self.with_serial = "eeprom_serial.bin"
