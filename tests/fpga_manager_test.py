@@ -182,16 +182,6 @@ class FPGAManagerTest(Test):
 		pool.join()
 		
 		fm.close()
-	
-	@avocado.skip("to be moved")
-	def test_tmp(self):
-		from fpga_board import FPGABoard
-		
-		with FPGABoard.get_suitable_board() as fpga:
-			fpga.flash_bitstream("fpga_manager_test.py.data/sum_fpga/sum_fpga_Implmnt/sbt/outputs/bitmap/sum_fpga_top_bitmap.bin")#/home/clemens/ehs/components/board/tests/
-			fpga.uart.write(range(20))
-			s = fpga.uart.read(1)
-			print(s)
 
 def max_true(individual):
 	with get_fpga_board() as fpga_board:

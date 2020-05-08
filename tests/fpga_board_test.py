@@ -4,8 +4,10 @@ import os
 import sys
 from array import array
 import unittest.mock as mock
+import random
 
 from avocado import Test
+import avocado
 from pyftdi.usbtools import UsbDeviceDescriptor
 
 sys.path.append(
@@ -44,3 +46,14 @@ class FPGABoardTest(Test):
 			res = FPGABoard.get_suitable_board(baudrate, timeout)
 			
 			mock_init.assert_called_once_with(res, self.valid_sn, baudrate, timeout)
+	
+	@avocado.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	def test_flash_bitstream(self):
+		data_length = 10
+		bitstream_path = self.get_data("echo_fpga.bin")
+		with FPGABoard.get_suitable_board() as fpga:
+			fpga.flash_bitstream(bitstream_path)
+			data = bytes(random.choices(range(256), k=data_length))
+			fpga.uart.write(data)
+			read_data = fpga.uart.read(data_length)
+			self.assertEqual(data, read_data, "Received data differs from send data; Echo botstream not working")
