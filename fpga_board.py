@@ -184,6 +184,15 @@ class FPGABoard:
 	
 	@classmethod
 	def get_suitable_board(cls, baudrate=3000000, timeout=0.5):
+		suitable = cls.get_suitable_serial_numbers()
+		
+		if len(suitable) == 0:
+			raise Exception("No suitable devices found.")
+		
+		return cls(suitable[0], baudrate, timeout)
+	
+	@staticmethod
+	def get_suitable_serial_numbers():
 		ft2232_devices = Ftdi.find_all([(0x0403, 0x6010)], True)
 		
 		suitable = []
@@ -191,10 +200,7 @@ class FPGABoard:
 			if is_valid_serial_number(desc.sn) and i_count==2:
 				suitable.append(desc.sn)
 		
-		if len(suitable) == 0:
-			raise Exception("No suitable devices found.")
-		
-		return cls(suitable[0], baudrate, timeout)
+		return suitable
 	
 	@staticmethod
 	def usleep(usec):

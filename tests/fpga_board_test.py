@@ -17,16 +17,30 @@ sys.path.append(
 from fpga_board import FPGABoard
 
 class FPGABoardTest(Test):
-	def test_get_suitable_board(self):
-		serial_number =  "T80000"
-		baudrate = 968123
-		timeout = 8.1
-		dev_list = [
+	def setUp(self):
+		self.valid_sn =  "T80000"
+		self.dev_list = [
 			(UsbDeviceDescriptor(0x0403, 0x6010, 3, 6, "T8S001", 0, "invalid number of interfaces"), 1),
 			(UsbDeviceDescriptor(0x0403, 0x6010, 3, 6, "T80002", 0, "invalid serial"), 2),
-			(UsbDeviceDescriptor(0x0403, 0x6010, 3, 7, serial_number, 0, "valid board"), 2),
+			(UsbDeviceDescriptor(0x0403, 0x6010, 3, 7, self.valid_sn, 0, "valid board"), 2),
 		]
-		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: dev_list), mock.patch("fpga_board_test.FPGABoard.__init__", autospec=True, return_value=None) as mock_init:
+	
+	def test_get_suitable_serial_numbers(self):
+		other_sn = "T8P002"
+		self.dev_list.append(
+			(UsbDeviceDescriptor(0x0403, 0x6010, 2, 7, other_sn, 0, "second valid board"), 2)
+		)
+		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: self.dev_list):
+			res = FPGABoard.get_suitable_serial_numbers()
+			
+			set_res = set(res)
+			self.assertEqual(len(res), len(set_res), "some serial numbers returned multiple times")
+			self.assertEqual({self.valid_sn, other_sn}, set_res, "some unexpected or some missing serial numbers")
+	
+	def test_get_suitable_board(self):
+		baudrate = 968123
+		timeout = 8.1
+		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: self.dev_list), mock.patch("fpga_board_test.FPGABoard.__init__", autospec=True, return_value=None) as mock_init:
 			res = FPGABoard.get_suitable_board(baudrate, timeout)
 			
-			mock_init.assert_called_once_with(res, serial_number, baudrate, timeout)
+			mock_init.assert_called_once_with(res, self.valid_sn, baudrate, timeout)
