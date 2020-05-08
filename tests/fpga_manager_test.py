@@ -162,9 +162,12 @@ class FPGAManagerTest(Test):
 		pop = toolbox.init_pop(n=10)
 		algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
-	@avocado.skip("broken DUT")
+	#@avocado.skip("broken DUT")
 	def test_multi(self):
 		toolbox = create_toolbox()
+		# add the directory of this file to the path so pickle can find this module when pickling
+		# necessary for execution with avocado
+		sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 		
 		fm = fpga_manager.FPGAManager.create_manager()
 		pool = fm.generate_pool()
