@@ -161,8 +161,11 @@ class FPGABoard:
 		return (gpio & self.CDONE) != 0
 	
 	@classmethod
-	def pack_bitstream(cls, asc_name, bitstream_name):
-		cls.no_int_subprocess(["icepack", asc_name, bitstream_name])
+	def pack_bitstream(cls, asc_name, bitstream_name, compress=False):
+		cmd = ["icepack", asc_name, bitstream_name]
+		if compress:
+			cmd.append("-z")
+		cls.no_int_subprocess(cmd)
 	
 	@staticmethod
 	def ignore_sigint():
