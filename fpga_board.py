@@ -56,6 +56,21 @@ class FPGABoard:
 	def close(self):
 		self._close()
 	
+	def read_bytes(self, byte_count):
+		response = self._uart.read(byte_count)
+		# reverse from little endian
+		return response[::-1]
+	
+	def read_integers(self, count=1, data_width=1):
+		res = []
+		for _ in range(count):
+			raw_data = self._uart.read(data_width)
+			assert len(raw_data) == data_width, "Expected {} bytes, but got {}".format(data_width, len(raw_data))
+			value = int.from_bytes(raw_data, 'little')
+			res.append(value)
+		
+		return res
+	
 	def _close(self):
 		if not self._is_open:
 			return
