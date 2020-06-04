@@ -201,13 +201,15 @@ class FPGABoard:
 		return out
 	
 	@classmethod
-	def get_suitable_board(cls, baudrate=3000000, timeout=0.5):
-		suitable = cls.get_suitable_serial_numbers()
+	def get_suitable_board(cls, baudrate=3000000, timeout=0.5, black_list=[]):
+		suitable = set(cls.get_suitable_serial_numbers())
+		
+		suitable.difference_update(black_list)
 		
 		if len(suitable) == 0:
 			raise Exception("No suitable devices found.")
 		
-		return cls(suitable[0], baudrate, timeout)
+		return cls(suitable.pop(), baudrate, timeout)
 	
 	@staticmethod
 	def get_suitable_serial_numbers():
