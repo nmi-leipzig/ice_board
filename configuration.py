@@ -3,14 +3,58 @@
 from array import array
 import timeit
 
+from device_data import SPECS_BY_ASC, TileType
+
 class Configuration:
 	"""represents the configuration of a FPGA"""
 	
-	def __init__(self):
-		#self._chip = "8k"
-		pass
-		#TODO: decide list of bool, bytearray or array('B')
-		# most frequent operations: set, read, to string
+	def __init__(self, device_spec):
+		self._spec = device_spec
+		self.clear()
+	
+	def clear(self):
+		self._bram = {}
+		self._tiles = {}
+		self._tiles_by_type = {}
+		
+		for pos, ttype in self._spec.get_tile_types():
+			width = self._spec.tile_type_width[ttype]
+			height = self._spec.tile_height
+			data = tuple([False]*width for _ in range(height))
+			self._tiles[pos] = data
+			self._tiles_by_type.setdefault(ttype, []).append(pos)
+			
+			if ttype == TileType.RAM_B:
+				self._bram[pos] = tuple([False]*256 for _ in range(16))
+	
+	@classmethod
+	def create_blank(cls, asc_name="8k"):
+		spec = SPECS_BY_ASC[asc_name]
+		config = cls(spec)
+		
+		return config
+	
+	@classmethod
+	def create_from_asc(cls, asc_filename):
+		with open(asc_filename, "r") as asc_file:
+			asc_name = cls.device_from_asc(asc_file)
+			config = cls.create_blank(asc_name)
+			
+			# reset for parsing
+			asc_file.seek(0)
+			
+			config.read_asc(asc_file)
+			return config
+	
+	@staticmethod
+	def device_from_asc(asc_file):
+		for line in asc_file:
+			line = line.strip()
+			if line.startswith(".device"):
+				parts = line.split()
+				return parts[1]
+		
+		raise ValueError("asc file without device entry")
 
 class BLConf:
 	def __init__(self):
