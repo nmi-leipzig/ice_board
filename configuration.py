@@ -3,9 +3,9 @@
 from array import array
 import timeit
 import enum
-from typing import NamedTuple, TextIO
+from typing import NamedTuple, TextIO, Iterable
 
-from device_data import SPECS_BY_ASC, TileType, DeviceSpec
+from device_data import SPECS_BY_ASC, TileType, DeviceSpec, TilePosition, Bit
 
 class ExtraBit(NamedTuple):
 	bank: int
@@ -47,6 +47,12 @@ class Configuration:
 			if ttype == TileType.RAM_B:
 				self._bram[pos] = tuple([False]*256 for _ in range(16))
 		
+	
+	def get_bits(self, tile: TilePosition, bits: Iterable[Bit]):
+		tile_data = self._tiles[tile]
+		values = [tile_data[b.group][b.index] for b in bits]
+		
+		return tuple(values)
 	
 	def read_asc(self, asc_file: TextIO):
 		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])
