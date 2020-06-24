@@ -32,6 +32,7 @@ class Configuration:
 		self._bram = {}
 		self._tiles = {}
 		self._tiles_by_type = {}
+		self._tile_types = {}
 		self._comment = ""
 		self._warmboot = True
 		self._nosleep = False
@@ -43,6 +44,7 @@ class Configuration:
 			data = tuple([False]*width for _ in range(height))
 			self._tiles[pos] = data
 			self._tiles_by_type.setdefault(ttype, []).append(pos)
+			self._tile_types[pos] = ttype
 			
 			if ttype == TileType.RAM_B:
 				self._bram[pos] = tuple([False]*256 for _ in range(16))
@@ -140,6 +142,44 @@ class Configuration:
 				current_data.append(line)
 		
 		self._comment = "".join(comment_data)
+	
+	def write_asc(self, asc_file: TextIO):
+		if self._comment != "":
+			asc_file.write(".comment\n")
+			asc_file.write(self._comment)
+			if self._comment[-1] != "\n":
+				asc_file.write("\n")
+		
+		asc_file.write(f".device {self._spec.asc_name }\n")
+		
+		if not self._warmboot:
+			asc_file.write(f".warmboot disabled\n")
+		
+		for pos in sorted(self._tiles):
+			tile_type = self._tile_types[pos]
+			data = self._tiles[pos]
+			
+			asc_file.write(f".{TILE_TYPE_TO_ASC_ENTRY[tile_type]} {pos.x} {pos.y}\n")
+			for row in data:
+				asc_file.write("".join(f"{b:b}" for b in row))
+				asc_file.write("\n")
+		
+		for pos in sorted(self._bram):
+			data = self._bram[pos]
+			if not any(any(r) for r in data):
+				continue
+			
+			asc_file.write(f".ram_data {pos.x} {pos.y}\n")
+			for row in data:
+				str_list = []
+				for i in range(len(row)//4):
+					val = row[4*i+3] << 3 | row[4*i+2] << 2 | row[4*i+1] << 1 | row[4*i]
+					str_list.append(f"{val:x}")
+				asc_file.write("".join(str_list[::-1]))
+				asc_file.write("\n")
+		
+		for extra_bit in self._extra_bits:
+			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
 	@staticmethod
 	def get_line(file_obj):
