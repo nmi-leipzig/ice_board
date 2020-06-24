@@ -8,6 +8,10 @@ class TilePosition(NamedTuple):
 	x: int
 	y: int
 
+class Bit(NamedTuple):
+	group: int
+	index: int
+
 @dataclass(frozen=True)
 class DeviceSpec:
 	asc_name: str
@@ -30,6 +34,10 @@ class DeviceSpec:
 		for y in range(1, self.max_y):
 			yield TilePosition(0, y), TileType.IO
 			yield TilePosition(self.max_x, y), TileType.IO
+		for x in range(1, self.max_x):
+			yield TilePosition(x, 0), TileType.IO
+			yield TilePosition(x, self.max_y), TileType.IO
+		
 		# RAM & LOGIC
 		for x in range(1, self.max_x):
 			for y in range(1, self.max_y):
@@ -40,7 +48,7 @@ class DeviceSpec:
 						ttype = TileType.RAM_B
 				else:
 					ttype = TileType.LOGIC
-				return TilePosition(x, y), ttype
+				yield TilePosition(x, y), ttype
 	
 
 SPECS = (

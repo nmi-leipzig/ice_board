@@ -2,13 +2,29 @@
 
 from array import array
 import timeit
+import enum
+from typing import NamedTuple, TextIO
 
-from device_data import SPECS_BY_ASC, TileType
+from device_data import SPECS_BY_ASC, TileType, DeviceSpec
+
+class ExtraBit(NamedTuple):
+	bank: int
+	x: int
+	y: int
+
+TILE_TYPE_TO_ASC_ENTRY = {
+	TileType.LOGIC: "logic_tile",
+	TileType.IO: "io_tile",
+	TileType.RAM_T: "ramt_tile",
+	TileType.RAM_B: "ramb_tile",
+}
+
+ASC_ENTRY_TO_TILE_TYPE = {a:t for t, a in TILE_TYPE_TO_ASC_ENTRY.items()}
 
 class Configuration:
 	"""represents the configuration of a FPGA"""
 	
-	def __init__(self, device_spec):
+	def __init__(self, device_spec: DeviceSpec):
 		self._spec = device_spec
 		self.clear()
 	
@@ -16,6 +32,10 @@ class Configuration:
 		self._bram = {}
 		self._tiles = {}
 		self._tiles_by_type = {}
+		self._comment = ""
+		self._warmboot = True
+		self._nosleep = False
+		self._extra_bits = []
 		
 		for pos, ttype in self._spec.get_tile_types():
 			width = self._spec.tile_type_width[ttype]
@@ -26,16 +46,109 @@ class Configuration:
 			
 			if ttype == TileType.RAM_B:
 				self._bram[pos] = tuple([False]*256 for _ in range(16))
+		
+	
+	def read_asc(self, asc_file: TextIO):
+		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])
+		state = ASCState.READ_LINE
+		comment_data = []
+		current_data = None
+		self.clear()
+		while True:
+			if state == ASCState.READ_LINE:
+				try:
+					line = self.get_line(asc_file)
+				except EOFError:
+					break
+				
+				state = ASCState.FIND_ENTRY
+			elif state == ASCState.FIND_ENTRY:
+				# default next state
+				state = ASCState.READ_LINE
+				
+				line = line.strip()
+				if line == "":
+					continue
+				
+				if line[0] != ".":
+					raise ValueError(f"expected start of entry, found '{line[:40]}' instead")
+				
+				parts = line.split()
+				
+				entry = parts[0][1:]
+				if entry in ASC_ENTRY_TO_TILE_TYPE:
+					current_data = self._tiles[(int(parts[1]), int(parts[2]))]
+					for row in range(16):
+						line = self.get_line(asc_file).strip()
+						for col in range(len(current_data[row])):
+							current_data[row][col] = (line[col] == "1")
+				elif entry == "ram_data":
+					ram_data = self._bram[(int(parts[1]), int(parts[2]))]
+					for row in range(16):
+						line = self.get_line(asc_file).strip()
+						ram_index = 0
+						for str_index in range(63, -1, -1):
+							val = int(line[str_index], 16)
+							for _ in range(4):
+								ram_data[row][ram_index] = ((val & 1) == 1)
+								val >>= 1
+								ram_index += 1
+				elif entry == "extra_bit":
+					extra_bit = ExtraBit(int(parts[1]), int(parts[2]), int(parts[3]))
+					self._extra_bits.append(extra_bit)
+				elif entry == "comment":
+					current_data = comment_data
+					state = ASCState.READ_TO_NEXT
+				elif entry == "device":
+					if self._spec.asc_name != parts[1]:
+						raise ValueError(f"asc for {parts[1]}, not {self._spec.asc_name}")
+				elif entry == "warmboot":
+					assert part[1] in ("enabled", "disabled")
+					self._warmboot = (part[1] == "enabled")
+				elif entry == "sym":
+					# ignore symbols
+					pass
+				else:
+					raise ValueError(f"unknown entry '{entry}'")
+			elif state == ASCState.READ_TO_NEXT:
+				try:
+					line = self.get_line(asc_file)
+				except EOFError:
+					break
+				
+				# check if entry
+				# fails if a comment line starts with '.'
+				entry_line = line.lstrip()
+				try:
+					if entry_line[0] == ".":
+						state = ASCState.FIND_ENTRY
+						continue
+				except IndexError:
+					pass
+				
+				current_data.append(line)
+		
+		self._comment = "".join(comment_data)
+	
+	@staticmethod
+	def get_line(file_obj):
+		line = file_obj.readline()
+		
+		# empty string means EOF, '\n' means empty line
+		if line == "":
+			raise EOFError()
+		
+		return line
 	
 	@classmethod
-	def create_blank(cls, asc_name="8k"):
+	def create_blank(cls, asc_name: str="8k"):
 		spec = SPECS_BY_ASC[asc_name]
 		config = cls(spec)
 		
 		return config
 	
 	@classmethod
-	def create_from_asc(cls, asc_filename):
+	def create_from_asc(cls, asc_filename: str):
 		with open(asc_filename, "r") as asc_file:
 			asc_name = cls.device_from_asc(asc_file)
 			config = cls.create_blank(asc_name)
@@ -47,7 +160,7 @@ class Configuration:
 			return config
 	
 	@staticmethod
-	def device_from_asc(asc_file):
+	def device_from_asc(asc_file: TextIO):
 		for line in asc_file:
 			line = line.strip()
 			if line.startswith(".device"):

@@ -2,6 +2,7 @@ import os
 import sys
 from typing import NamedTuple
 import time
+import json
 
 import avocado
 
@@ -12,6 +13,7 @@ sys.path.append(
 )
 
 from configuration import Configuration
+from device_data import TilePosition, Bit
 
 class ASCEntry(NamedTuple):
 	name: str
@@ -20,7 +22,7 @@ class ASCEntry(NamedTuple):
 class ConfigurationTest(avocado.Test):
 	
 	def test_device_from_asc(self):
-		asc_path = self.get_data("echo.asc", must_exist=True)
+		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
 		with open(asc_path, "r") as asc_file:
 			res = Configuration.device_from_asc(asc_file)
 		
@@ -30,11 +32,45 @@ class ConfigurationTest(avocado.Test):
 		res = Configuration.create_blank()
 	
 	def test_create_from_asc(self):
-		asc_path = self.get_data("echo.asc", must_exist=True)
+		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
 		res = Configuration.create_from_asc(asc_path)
+		
+		# check logic cell
+		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
+		with open(data_path, "r") as data_file:
+			data = json.load(data_file)
+		tile_pos = TilePosition(*data[0])
+		
+		tile_data = tuple(data[1])
+		
+		self.assertEqual(tile_data, res._tiles[tile_pos])
+		
+		# check bram
+		bram_pos = TilePosition(*data[2])
+		bram_data = tuple(data[3])
+		
+		self.assertEqual(bram_data, res._bram[bram_pos][:len(bram_data)])
+		rest = tuple([False]*len(bram_data[0]) for _ in range(len(res._bram[bram_pos])-len(bram_data)))
+		self.assertEqual(rest, res._bram[bram_pos][len(bram_data):])
 	
 	def test_get_bits(self):
-		pass
+		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
+		res = Configuration.create_from_asc(asc_path)
+		
+		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
+		with open(data_path, "r") as data_file:
+			data = json.load(data_file)
+		tile_pos = TilePosition(*data[0])
+		
+		tile_data = tuple(data[1])
+		
+		# single bits
+		for group in range(len(tile_data)):
+			for index in range(len(tile_data[0])):
+				bits = (Bit(group, index), )
+				values = res.get_bits(tile_pos, bits)
+				expected = (tile_data[group][index], )
+				self.assertEqual(expected, values)
 	
 	def test_set_bits(self):
 		pass
