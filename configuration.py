@@ -54,6 +54,11 @@ class Configuration:
 		
 		return tuple(values)
 	
+	def set_bits(self, tile: TilePosition, bits: Iterable[Bit], values: Iterable[bool]):
+		tile_data = self._tiles[tile]
+		for i, b in enumerate(bits):
+			tile_data[b.group][b.index] = values[i]
+	
 	def read_asc(self, asc_file: TextIO):
 		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])
 		state = ASCState.READ_LINE

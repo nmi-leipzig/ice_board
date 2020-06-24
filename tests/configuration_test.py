@@ -24,16 +24,16 @@ class ConfigurationTest(avocado.Test):
 	def test_device_from_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
 		with open(asc_path, "r") as asc_file:
-			res = Configuration.device_from_asc(asc_file)
+			config = Configuration.device_from_asc(asc_file)
 		
-		self.assertEqual("8k", res)
+		self.assertEqual("8k", config)
 	
 	def test_creation(self):
-		res = Configuration.create_blank()
+		config = Configuration.create_blank()
 	
 	def test_create_from_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		res = Configuration.create_from_asc(asc_path)
+		config = Configuration.create_from_asc(asc_path)
 		
 		# check logic cell
 		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
@@ -43,19 +43,19 @@ class ConfigurationTest(avocado.Test):
 		
 		tile_data = tuple(data[1])
 		
-		self.assertEqual(tile_data, res._tiles[tile_pos])
+		self.assertEqual(tile_data, config._tiles[tile_pos])
 		
 		# check bram
 		bram_pos = TilePosition(*data[2])
 		bram_data = tuple(data[3])
 		
-		self.assertEqual(bram_data, res._bram[bram_pos][:len(bram_data)])
-		rest = tuple([False]*len(bram_data[0]) for _ in range(len(res._bram[bram_pos])-len(bram_data)))
-		self.assertEqual(rest, res._bram[bram_pos][len(bram_data):])
+		self.assertEqual(bram_data, config._bram[bram_pos][:len(bram_data)])
+		rest = tuple([False]*len(bram_data[0]) for _ in range(len(config._bram[bram_pos])-len(bram_data)))
+		self.assertEqual(rest, config._bram[bram_pos][len(bram_data):])
 	
 	def test_get_bits(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		res = Configuration.create_from_asc(asc_path)
+		config = Configuration.create_from_asc(asc_path)
 		
 		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
 		with open(data_path, "r") as data_file:
@@ -68,12 +68,29 @@ class ConfigurationTest(avocado.Test):
 		for group in range(len(tile_data)):
 			for index in range(len(tile_data[0])):
 				bits = (Bit(group, index), )
-				values = res.get_bits(tile_pos, bits)
+				values = config.get_bits(tile_pos, bits)
 				expected = (tile_data[group][index], )
 				self.assertEqual(expected, values)
+		
+		# multiple bits
+		for bits in ((Bit(3, 4), Bit(0, 0)), (Bit(8, 7), Bit(3, 22), Bit(2, 9), Bit(15, 38))):
+			expected = tuple(tile_data[b.group][b.index] for b in bits)
+			values = config.get_bits(tile_pos, bits)
+			self.assertEqual(expected, values)
 	
 	def test_set_bits(self):
-		pass
+		test_data = (
+			(TilePosition(0, 1), (Bit(7, 17), ), (True, )),
+			(TilePosition(25, 7), (Bit(7, 17), Bit(8, 7)), (True, False)),
+			(TilePosition(15, 16), (Bit(7, 17), Bit(3, 22), Bit(2, 9), Bit(15, 38)), (False, True, False, True)),
+		)
+		
+		config = Configuration.create_blank()
+		
+		for tile_pos, bits, values in test_data:
+			config.set_bits(tile_pos, bits, values)
+			read = config.get_bits(tile_pos, bits)
+			self.assertEqual(values, read)
 	
 	def test_asc_compare(self):
 		"""self test for the assert_structural_equal method """
