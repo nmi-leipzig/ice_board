@@ -28,6 +28,9 @@ class ASCEntry(NamedTuple):
 	line_data: tuple
 
 class ConfigurationTest(avocado.Test):
+	"""
+	:avocado: tags=components
+	"""
 	
 	def test_device_from_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
