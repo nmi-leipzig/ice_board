@@ -5,7 +5,7 @@ import timeit
 import enum
 from typing import NamedTuple, TextIO, Iterable
 
-from device_data import SPECS_BY_ASC, TileType, DeviceSpec, TilePosition, Bit
+from device_data import SPECS_BY_ASC, TileType, BRAMMode, DeviceSpec, TilePosition, Bit
 
 class ExtraBit(NamedTuple):
 	bank: int
@@ -60,6 +60,62 @@ class Configuration:
 		tile_data = self._tiles[tile]
 		for i, b in enumerate(bits):
 			tile_data[b.group][b.index] = values[i]
+	
+	@classmethod
+	def block_size_from_mode(cls, mode: BRAMMode):
+		return 4096//cls.value_length_from_mode(mode)
+	
+	@staticmethod
+	def value_length_from_mode(mode: BRAMMode):
+		return 16 >> mode.value
+	
+	@staticmethod
+	def split_bram_address(address: int):
+		index = address % 256
+		offset = address // 256
+		col_index = index % 16
+		row_index = index // 16
+		
+		return row_index, col_index, offset
+	
+	@classmethod
+	def get_from_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, mode: BRAMMode=BRAMMode.BRAM_512x8):
+		value_len = cls.value_length_from_mode(mode)
+		row_index, col_index, offset = cls.split_bram_address(address)
+		#TODO: continue here to rewrite for bool (is for str)
+		l = len(ram_strings[row_index])
+		
+		str_word = ram_strings[row_index][l-4*(col_index+1):l-4*col_index]
+		int_word = int(str_word, 16)
+		
+		if value_len == 16:
+			return int_word
+		
+		step = 16 // value_len
+		int_word >>= offset
+		mask = 1
+		value = 0
+		for i in range(value_len):
+			value |= mask & int_word
+			mask <<= 1
+			int_word >>= step - 1
+		
+		return value
+	
+	def get_bram_values(self, ram_block: TilePosition, address: int=0, count: int=1, mode: BRAMMode=BRAMMode.BRAM_512x8):
+		bram_data =self._bram[ram_block]
+		values = []
+		for tmp_address in range(address, address+count):
+			value = self.get_from_bram_data(bram_data, tmp_address, mode)
+			values.append(value)
+		
+		return values
+	
+	def set_bram_values(self, ram_block: TilePosition, values: Iterable[int], address: int=0, mode: BRAMMode=BRAMMode.BRAM_512x8):
+		ram_data = self._bram[ram_block]
+		#for value in values:
+		#	self.set_in_ram_strings(ram_strings, address, value, mode)
+		#	offset += 1
 	
 	def read_asc(self, asc_file: TextIO):
 		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])

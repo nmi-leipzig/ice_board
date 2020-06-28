@@ -1,6 +1,7 @@
 import os
 import sys
-from typing import NamedTuple
+from dataclasses import dataclass
+from typing import NamedTuple, List
 import time
 import json
 
@@ -13,7 +14,7 @@ sys.path.append(
 )
 
 from configuration import Configuration
-from device_data import TilePosition, Bit
+from device_data import TilePosition, BRAMMode, Bit
 
 sys.path.append("/usr/local/bin")
 def load_icebox():
@@ -27,10 +28,30 @@ class ASCEntry(NamedTuple):
 	name: str
 	line_data: tuple
 
+@dataclass
+class SendBRAMMeta:
+	mode: BRAMMode
+	asc_filename: str
+	ram_block: TilePosition
+	initial_data: List[int]
+	mask: int
+	
+	def __post_init__(self):
+		if isinstance(self.mode, str):
+			self.mode = BRAMMode[self.mode]
+		self.ram_block = TilePosition(*self.ram_block)
+
 class ConfigurationTest(avocado.Test):
 	"""
 	:avocado: tags=components
 	"""
+	
+	def load_send_bram_meta(self):
+		json_path = self.get_data("send_all_bram.json", must_exist=True)
+		with open(json_path, "r") as json_file:
+			send_bram_meta = tuple([SendBRAMMeta(*s) for s in json.load(json_file)])
+		
+		return send_bram_meta
 	
 	def test_device_from_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
@@ -41,7 +62,6 @@ class ConfigurationTest(avocado.Test):
 	
 	def test_creation(self):
 		config = Configuration.create_blank()
-		self.assertEqual({1:0, 2:5}, {2:5, 1:0})
 	
 	def test_create_from_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
@@ -159,6 +179,26 @@ class ConfigurationTest(avocado.Test):
 			config.set_bits(tile_pos, bits, values)
 			read = config.get_bits(tile_pos, bits)
 			self.assertEqual(values, read)
+	
+	def test_get_bram_values(self):
+		sbm = self.load_send_bram_meta()
+		for current in sbm:
+			with self.subTest(mode=current.mode):
+				asc_path = self.get_data(current.asc_filename, must_exist=True)
+				config = Configuration.create_from_asc(asc_path)
+				
+				# read single
+				for address, expected in enumerate(current.initial_data):
+					value = config.get_bram_values(current.ram_block, address, 1, current.mode)
+					self.assertEqual(expected, value[0])
+				
+				# read all
+				values = config.get_bram_values(current.ram_block, 0, len(current.initial_data), current.mode)
+				self.assertEqual(current.initial_data, values)
+			
+	
+	def test_set_bram_values(self):
+		pass
 	
 	def test_asc_compare(self):
 		"""self test for the assert_structural_equal method """
