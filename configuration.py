@@ -93,6 +93,22 @@ class Configuration:
 		
 		return value
 	
+	@classmethod
+	def set_in_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, value: int, mode: BRAMMode=BRAMMode.BRAM_512x8):
+		value_len = cls.value_length_from_mode(mode)
+		row_index, col_index, offset = cls.split_bram_address(address)
+		
+		assert value >= 0, "Value has to be non negative."
+		assert value < pow(2, value_len), f"Value {value} too large for bit length {value_len}."
+		
+		row_data = bram_data[row_index]
+		index = col_index * 16 + offset
+		step = 16 // value_len
+		for i in range(value_len):
+			row_data[index] = ((value >> i) & 1) == 1
+			index += step
+		
+	
 	def get_bram_values(self, ram_block: TilePosition, address: int=0, count: int=1, mode: BRAMMode=BRAMMode.BRAM_512x8):
 		bram_data =self._bram[ram_block]
 		values = []
@@ -104,9 +120,9 @@ class Configuration:
 	
 	def set_bram_values(self, ram_block: TilePosition, values: Iterable[int], address: int=0, mode: BRAMMode=BRAMMode.BRAM_512x8):
 		ram_data = self._bram[ram_block]
-		#for value in values:
-		#	self.set_in_ram_strings(ram_strings, address, value, mode)
-		#	offset += 1
+		for value in values:
+			self.set_in_bram_data(ram_data, address, value, mode)
+			address += 1
 	
 	def read_asc(self, asc_file: TextIO):
 		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])

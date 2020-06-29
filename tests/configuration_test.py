@@ -198,6 +198,25 @@ class ConfigurationTest(avocado.Test):
 			
 	
 	def test_set_bram_values(self):
+		sbm = self.load_send_bram_meta()
+		for current in sbm:
+			with self.subTest(mode=current.mode):
+				asc_path = self.get_data(current.asc_filename, must_exist=True)
+				config = Configuration.create_from_asc(asc_path)
+				
+				expected = list(current.initial_data)
+				# write single
+				for address, old_value in enumerate(current.initial_data):
+					new_value = current.mask ^ old_value
+					config.set_bram_values(current.ram_block, [new_value], address, current.mode)
+					expected[address] = new_value
+					values = config.get_bram_values(current.ram_block, 0, len(current.initial_data), current.mode)
+					self.assertEqual(expected, values)
+				
+				# write all
+				config.set_bram_values(current.ram_block, current.initial_data, 0, current.mode)
+				values = config.get_bram_values(current.ram_block, 0, len(current.initial_data), current.mode)
+				self.assertEqual(current.initial_data, values)
 		pass
 	
 	def test_asc_compare(self):
