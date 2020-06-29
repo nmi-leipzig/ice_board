@@ -3,7 +3,7 @@
 from array import array
 import timeit
 import enum
-from typing import NamedTuple, TextIO, Iterable
+from typing import NamedTuple, TextIO, Iterable, Tuple, List
 
 from device_data import SPECS_BY_ASC, TileType, BRAMMode, DeviceSpec, TilePosition, Bit
 
@@ -24,11 +24,11 @@ ASC_ENTRY_TO_TILE_TYPE = {a:t for t, a in TILE_TYPE_TO_ASC_ENTRY.items()}
 class Configuration:
 	"""represents the configuration of a FPGA"""
 	
-	def __init__(self, device_spec: DeviceSpec):
+	def __init__(self, device_spec: DeviceSpec) -> None:
 		self._spec = device_spec
 		self.clear()
 	
-	def clear(self):
+	def clear(self) -> None:
 		self._bram = {}
 		self._tiles = {}
 		self._tiles_by_type = {}
@@ -50,27 +50,27 @@ class Configuration:
 				self._bram[pos] = tuple([False]*256 for _ in range(16))
 		
 	
-	def get_bits(self, tile: TilePosition, bits: Iterable[Bit]):
+	def get_bits(self, tile: TilePosition, bits: Iterable[Bit]) -> Tuple[bool, ...]:
 		tile_data = self._tiles[tile]
 		values = [tile_data[b.group][b.index] for b in bits]
 		
 		return tuple(values)
 	
-	def set_bits(self, tile: TilePosition, bits: Iterable[Bit], values: Iterable[bool]):
+	def set_bits(self, tile: TilePosition, bits: Iterable[Bit], values: Iterable[bool]) -> None:
 		tile_data = self._tiles[tile]
 		for i, b in enumerate(bits):
 			tile_data[b.group][b.index] = values[i]
 	
 	@classmethod
-	def block_size_from_mode(cls, mode: BRAMMode):
+	def block_size_from_mode(cls, mode: BRAMMode) -> int:
 		return 4096//cls.value_length_from_mode(mode)
 	
 	@staticmethod
-	def value_length_from_mode(mode: BRAMMode):
+	def value_length_from_mode(mode: BRAMMode) -> int:
 		return 16 >> mode.value
 	
 	@staticmethod
-	def split_bram_address(address: int):
+	def split_bram_address(address: int) -> Tuple[int, int, int]:
 		index = address % 256
 		offset = address // 256
 		col_index = index % 16
@@ -79,7 +79,7 @@ class Configuration:
 		return row_index, col_index, offset
 	
 	@classmethod
-	def get_from_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, mode: BRAMMode=BRAMMode.BRAM_512x8):
+	def get_from_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, mode: BRAMMode=BRAMMode.BRAM_512x8) -> int:
 		value_len = cls.value_length_from_mode(mode)
 		row_index, col_index, offset = cls.split_bram_address(address)
 		
@@ -94,7 +94,7 @@ class Configuration:
 		return value
 	
 	@classmethod
-	def set_in_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, value: int, mode: BRAMMode=BRAMMode.BRAM_512x8):
+	def set_in_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, value: int, mode: BRAMMode=BRAMMode.BRAM_512x8) -> None:
 		value_len = cls.value_length_from_mode(mode)
 		row_index, col_index, offset = cls.split_bram_address(address)
 		
@@ -109,7 +109,7 @@ class Configuration:
 			index += step
 		
 	
-	def get_bram_values(self, ram_block: TilePosition, address: int=0, count: int=1, mode: BRAMMode=BRAMMode.BRAM_512x8):
+	def get_bram_values(self, ram_block: TilePosition, address: int=0, count: int=1, mode: BRAMMode=BRAMMode.BRAM_512x8) -> List[int]:
 		bram_data =self._bram[ram_block]
 		values = []
 		for tmp_address in range(address, address+count):
@@ -118,13 +118,13 @@ class Configuration:
 		
 		return values
 	
-	def set_bram_values(self, ram_block: TilePosition, values: Iterable[int], address: int=0, mode: BRAMMode=BRAMMode.BRAM_512x8):
+	def set_bram_values(self, ram_block: TilePosition, values: Iterable[int], address: int=0, mode: BRAMMode=BRAMMode.BRAM_512x8) -> None:
 		ram_data = self._bram[ram_block]
 		for value in values:
 			self.set_in_bram_data(ram_data, address, value, mode)
 			address += 1
 	
-	def read_asc(self, asc_file: TextIO):
+	def read_asc(self, asc_file: TextIO) -> None:
 		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])
 		state = ASCState.READ_LINE
 		comment_data = []
@@ -206,7 +206,7 @@ class Configuration:
 		
 		self._comment = "".join(comment_data)
 	
-	def write_asc(self, asc_file: TextIO):
+	def write_asc(self, asc_file: TextIO) -> None:
 		if self._comment != "":
 			asc_file.write(".comment\n")
 			asc_file.write(self._comment)
@@ -245,7 +245,7 @@ class Configuration:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
 	@staticmethod
-	def get_line(file_obj):
+	def get_line(file_obj) -> str:
 		line = file_obj.readline()
 		
 		# empty string means EOF, '\n' means empty line
@@ -255,14 +255,14 @@ class Configuration:
 		return line
 	
 	@classmethod
-	def create_blank(cls, asc_name: str="8k"):
+	def create_blank(cls, asc_name: str="8k") -> "Configuration":
 		spec = SPECS_BY_ASC[asc_name]
 		config = cls(spec)
 		
 		return config
 	
 	@classmethod
-	def create_from_asc(cls, asc_filename: str):
+	def create_from_asc(cls, asc_filename: str) -> "Configuration":
 		with open(asc_filename, "r") as asc_file:
 			asc_name = cls.device_from_asc(asc_file)
 			config = cls.create_blank(asc_name)
@@ -274,7 +274,7 @@ class Configuration:
 			return config
 	
 	@staticmethod
-	def device_from_asc(asc_file: TextIO):
+	def device_from_asc(asc_file: TextIO) -> str:
 		for line in asc_file:
 			line = line.strip()
 			if line.startswith(".device"):
