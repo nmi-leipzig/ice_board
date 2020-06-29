@@ -82,23 +82,14 @@ class Configuration:
 	def get_from_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, mode: BRAMMode=BRAMMode.BRAM_512x8):
 		value_len = cls.value_length_from_mode(mode)
 		row_index, col_index, offset = cls.split_bram_address(address)
-		#TODO: continue here to rewrite for bool (is for str)
-		l = len(ram_strings[row_index])
 		
-		str_word = ram_strings[row_index][l-4*(col_index+1):l-4*col_index]
-		int_word = int(str_word, 16)
-		
-		if value_len == 16:
-			return int_word
-		
+		row_data = bram_data[row_index]
+		index = col_index * 16 + offset
 		step = 16 // value_len
-		int_word >>= offset
-		mask = 1
 		value = 0
 		for i in range(value_len):
-			value |= mask & int_word
-			mask <<= 1
-			int_word >>= step - 1
+			value |= row_data[index] << i
+			index += step
 		
 		return value
 	
