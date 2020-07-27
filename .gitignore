@@ -1,0 +1,4 @@
+*.pyc
+*.prj
+*_Implmnt/
+__pycache__/
