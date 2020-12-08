@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
+import os
 from array import array
 import timeit
 import enum
 from typing import NamedTuple, TextIO, Iterable, Tuple, List
 
-from device_data import SPECS_BY_ASC, TileType, BRAMMode, DeviceSpec, TilePosition, Bit
+from .device_data import SPECS_BY_ASC, TileType, BRAMMode, DeviceSpec, TilePosition, Bit
 
 class ExtraBit(NamedTuple):
 	bank: int

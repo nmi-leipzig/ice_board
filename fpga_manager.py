@@ -8,8 +8,8 @@ import logging
 
 from pyftdi.ftdi import Ftdi
 
-from fpga_board import FPGABoard
-from serial_utils import check_serial_number, is_valid_serial_number, MalformedSerial
+from .fpga_board import FPGABoard
+from .serial_utils import check_serial_number, is_valid_serial_number, MalformedSerial
 
 class FPGAManager:
 	def __init__(self, mp_manager, min_nr=1, max_nr=0, serial_numbers=[], baudrate=3000000, timeout=0.5):

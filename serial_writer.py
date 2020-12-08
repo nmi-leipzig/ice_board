@@ -11,6 +11,7 @@ import logging
 import argparse
 import re
 import sys
+
 import serial_utils
 
 StringPosition = collections.namedtuple("StringPosition", ["offset", "length"])

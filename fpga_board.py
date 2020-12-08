@@ -2,7 +2,6 @@
 
 from pyftdi.ftdi import Ftdi
 import pyftdi.serialext
-from serial_utils import is_valid_serial_number
 import signal
 import sys
 import subprocess
@@ -11,6 +10,8 @@ import time
 
 sys.path.append("/usr/local/bin")
 import icebox
+
+from .serial_utils import is_valid_serial_number
 
 class ConfigurationError(Exception):
 	pass
