@@ -37,9 +37,6 @@ class SendBRAMMeta:
 		self.ram_block = TilePosition(*self.ram_block)
 
 class ConfigurationTest(unittest.TestCase):
-	"""
-	:avocado: tags=components
-	"""
 	@staticmethod
 	def get_data(filename, must_exist=False):
 		path = os.path.join(f"{__file__}.data", filename)
