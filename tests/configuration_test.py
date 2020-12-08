@@ -109,6 +109,8 @@ class ConfigurationTest(unittest.TestCase):
 		res_ic.read_file(out_path)
 		
 		self.check_configuration(expected_ic, res_ic)
+		
+		os.remove(out_path)
 	
 	def check_configuration(self, expected_config, config):
 		# compare two icebox configurations
