@@ -1,24 +1,17 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 from array import array
 import json
+import unittest
 
-from avocado import Test
+from ..serial_writer import SerialWriter
 
-sys.path.append(
-	os.path.dirname(
-		os.path.dirname(os.path.abspath(__file__))
-	)
-)
-
-from serial_writer import SerialWriter
-
-class SerialWriterTest(Test):
-	"""
-	:avocado: tags=components,quick
-	"""
+class SerialWriterTest(unittest.TestCase):
+	@staticmethod
+	def get_data(filename, must_exist=False):
+		path = os.path.join(f"{__file__}.data", filename)
+		return path
 	
 	def setUp(self):
 		self.with_serial = "eeprom_serial.bin"
