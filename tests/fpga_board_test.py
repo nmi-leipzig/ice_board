@@ -3,25 +3,19 @@
 import os
 import sys
 from array import array
-import unittest.mock as mock
 import random
+import unittest.mock as mock
+import unittest
 
-from avocado import Test
-import avocado
 from pyftdi.usbtools import UsbDeviceDescriptor
 
-sys.path.append(
-	os.path.dirname(
-		os.path.dirname(os.path.abspath(__file__))
-	)
-)
+from ..fpga_board import FPGABoard
 
-from fpga_board import FPGABoard
-
-class FPGABoardTest(Test):
-	"""
-	:avocado: tags=components,quick
-	"""
+class FPGABoardTest(unittest.TestCase):
+	@staticmethod
+	def get_data(filename, must_exist=False):
+		path = os.path.join(f"{__file__}.data", filename)
+		return path
 	
 	def setUp(self):
 		self.valid_sn =  "T80000"
@@ -46,12 +40,12 @@ class FPGABoardTest(Test):
 	def test_get_suitable_board(self):
 		baudrate = 968123
 		timeout = 8.1
-		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: self.dev_list), mock.patch("fpga_board_test.FPGABoard.__init__", autospec=True, return_value=None) as mock_init:
+		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: self.dev_list), mock.patch.object(FPGABoard, "__init__", autospec=True, return_value=None) as mock_init:
 			res = FPGABoard.get_suitable_board(baudrate, timeout)
 			
 			mock_init.assert_called_once_with(res, self.valid_sn, baudrate, timeout)
 	
-	@avocado.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
 	def test_flash_bitstream(self):
 		"""
 		:avocado: tags=hil
