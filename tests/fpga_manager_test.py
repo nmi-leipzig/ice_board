@@ -6,9 +6,8 @@ from array import array
 import unittest.mock as mock
 import random
 import logging
+import unittest
 
-from avocado import Test
-import avocado
 from pyftdi.usbtools import UsbDeviceDescriptor
 from deap import tools
 from deap import creator
@@ -21,16 +20,11 @@ sys.path.append(
 	)
 )
 
-import fpga_manager
-from fpga_manager import get_fpga_board
-from fpga_board import FPGABoard
-from serial_utils import is_valid_serial_number
+from ..fpga_manager import get_fpga_board, FPGAManager
+from ..fpga_board import FPGABoard
+from ..serial_utils import is_valid_serial_number
 
-class FPGAManagerTest(Test):
-	"""
-	:avocado: tags=components,quick
-	"""
-	
+class FPGAManagerTest(unittest.TestCase):
 	def generate_creation_data_set(self, valid, invalid):
 		"""Generate data set for FPGAManger creation
 		
@@ -82,7 +76,7 @@ class FPGAManagerTest(Test):
 		timeout = 8.1
 		
 		with mock.patch("pyftdi.ftdi.Ftdi.find_all", side_effect=lambda v, p: dev_list):
-			res = fpga_manager.FPGAManager.create_manager(min_nr, max_nr, requested_serial_numbers, baudrate, timeout)
+			res = FPGAManager.create_manager(min_nr, max_nr, requested_serial_numbers, baudrate, timeout)
 			
 			if expected_serial_numbers is None:
 				# don't check generated serial numbers
@@ -100,9 +94,6 @@ class FPGAManagerTest(Test):
 			self.generic_creation_test(None, dev_list, min_nr, max_nr, requested_serial_numbers)
 	
 	def test_creation(self):
-		"""
-		:avocado: tags=middle
-		"""
 		dev_list, sn_list = self.generate_creation_data_set(5, 3)
 		
 		# no requested, no upper limit
@@ -133,9 +124,6 @@ class FPGAManagerTest(Test):
 		self.generic_creation_test(sn_list[:3], dev_list, 2, 3, sn_list[:3])
 	
 	def test_creation_input_error(self):
-		"""
-		:avocado: tags=quick
-		"""
 		dev_list, sn_list = self.generate_creation_data_set(5, 3)
 		
 		# too low minimum
@@ -155,9 +143,6 @@ class FPGAManagerTest(Test):
 		self.generic_creation_error_test(ValueError, dev_list, 1, 0, sn_list+invalid_sn[:1])
 	
 	def test_creation_unavailable_error(self):
-		"""
-		:avocado: tags=quick
-		"""
 		dev_list, sn_list = self.generate_creation_data_set(5, 3)
 		
 		# minimum not reached
@@ -175,17 +160,14 @@ class FPGAManagerTest(Test):
 		pop = toolbox.init_pop(n=10)
 		algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.1, ngen=5)
 	
-	@avocado.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
 	def test_multi(self):
-		"""
-		:avocado: tags=hil,middle
-		"""
 		toolbox = create_toolbox()
 		# add the directory of this file to the path so pickle can find this module when pickling
 		# necessary for execution with avocado
 		sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 		
-		fm = fpga_manager.FPGAManager.create_manager()
+		fm = FPGAManager.create_manager()
 		pool = fm.generate_pool()
 		toolbox.register("map", pool.map)
 		
@@ -201,7 +183,7 @@ class FPGAManagerTest(Test):
 def max_true(individual):
 	with get_fpga_board() as fpga_board:
 		#print("Board in eval: {} {}".format(fpga_board.serial_number, hex(id(fpga_board))))
-		fpga_board.flash_bitstream("fpga_manager_test.py.data/sum_fpga.bin")
+		fpga_board.flash_bitstream(os.path.join(f"{__file__}.data", "sum_fpga.bin"))
 		#print("send individual")
 		fpga_board.uart.write(bytes(individual))
 		#print("read sum")
@@ -240,7 +222,7 @@ if __name__ == "__main__":
 	
 	random.seed(64)
 	
-	fm = fpga_manager.FPGAManager.create_manager()
+	fm = FPGAManager.create_manager()
 	#pool = fm.generate_pool(1)
 	pool = fm.generate_pool(log_level=logging.root.level)
 	toolbox.register("map", pool.map)
