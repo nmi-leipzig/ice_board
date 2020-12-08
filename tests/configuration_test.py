@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 from dataclasses import dataclass
@@ -5,16 +6,10 @@ from typing import NamedTuple, List
 import time
 import json
 
-import avocado
+import unittest
 
-sys.path.append(
-	os.path.dirname(
-		os.path.dirname(os.path.abspath(__file__))
-	)
-)
-
-from configuration import Configuration
-from device_data import TilePosition, BRAMMode, Bit
+from ..configuration import Configuration
+from ..device_data import TilePosition, BRAMMode, Bit
 
 sys.path.append("/usr/local/bin")
 def load_icebox():
@@ -41,10 +36,14 @@ class SendBRAMMeta:
 			self.mode = BRAMMode[self.mode]
 		self.ram_block = TilePosition(*self.ram_block)
 
-class ConfigurationTest(avocado.Test):
+class ConfigurationTest(unittest.TestCase):
 	"""
 	:avocado: tags=components
 	"""
+	@staticmethod
+	def get_data(filename, must_exist=False):
+		path = os.path.join(f"{__file__}.data", filename)
+		return path
 	
 	def load_send_bram_meta(self):
 		json_path = self.get_data("send_all_bram.json", must_exist=True)
@@ -94,9 +93,9 @@ class ConfigurationTest(avocado.Test):
 			res.seek(0)
 			self.assert_structural_equal(org, res)
 	
-	@avocado.skipUnless(load_icebox(), "icebox unavailable")
+	@unittest.skipUnless(load_icebox(), "icebox unavailable")
 	def test_write_asc_icestorm(self):
-		"""test writing asc based on iceconfig"""
+		# test writing asc based on iceconfig
 		import icebox
 		
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
@@ -220,7 +219,7 @@ class ConfigurationTest(avocado.Test):
 		pass
 	
 	def test_asc_compare(self):
-		"""self test for the assert_structural_equal method """
+		# self test for the assert_structural_equal method
 		
 		echo_path = self.get_data("echo.asc", must_exist=True)
 		send_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
@@ -267,4 +266,3 @@ class ConfigurationTest(avocado.Test):
 				prev_data.append(line)
 		
 		return asc_dict
-
