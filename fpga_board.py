@@ -80,6 +80,15 @@ class FPGABoard:
 		self._mpsse_dev.close()
 		self._is_open = False
 	
+	def reset_buffer(self, rst_input=True, rst_output=True):
+		if rst_input:
+			self._uart.reset_input_buffer()
+		if rst_output:
+			self._uart.reset_output_buffer()
+	
+	def flush(self):
+		self._uart.flush()
+	
 	def __enter__(self):
 		self._uart.reset_input_buffer()
 		return self
