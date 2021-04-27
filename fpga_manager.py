@@ -103,7 +103,8 @@ class FPGAManager:
 	def _close_boards(self):
 		with self._avail_lock:
 			for sn in list(self._avail_dict):
-				self._avail_dict.pop(sn)
+				if not self._avail_dict.pop(sn):
+					self._log.warn(f"board '{sn}' not released properly")
 				#board = self._boards.pop(sn)
 				#board.close()
 	
