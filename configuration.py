@@ -225,7 +225,7 @@ class Configuration:
 			
 			asc_file.write(f".{TILE_TYPE_TO_ASC_ENTRY[tile_type]} {pos.x} {pos.y}\n")
 			for row in data:
-				asc_file.write("".join("1" if b else "0" for b in row))
+				asc_file.write("".join(["1" if b else "0" for b in row]))
 				asc_file.write("\n")
 		
 		for pos in sorted(self._bram):
