@@ -51,11 +51,17 @@ class Configuration:
 				self._bram[pos] = tuple([False]*256 for _ in range(16))
 		
 	
+	def get_bit(self, x: int, y: int, group: int, index: int) -> bool:
+		return self._tiles[(x, y)][group][index]
+	
 	def get_bits(self, tile: TilePosition, bits: Iterable[Bit]) -> Tuple[bool, ...]:
 		tile_data = self._tiles[tile]
 		values = [tile_data[b.group][b.index] for b in bits]
 		
 		return tuple(values)
+	
+	def set_bit(self, x: int, y: int, group: int, index: int, value: bool) -> None:
+		self._tiles[(x, y)][group][index] = value
 	
 	def set_bits(self, tile: TilePosition, bits: Iterable[Bit], values: Iterable[bool]) -> None:
 		tile_data = self._tiles[tile]

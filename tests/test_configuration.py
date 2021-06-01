@@ -139,6 +139,23 @@ class ConfigurationTest(unittest.TestCase):
 			given_col = getattr(config, col_name)
 			self.assertEqual(expected_col, given_col, f"Contents of {col_name} differ from expected values:")
 	
+	def test_get_bit(self):
+		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
+		config = Configuration.create_from_asc(asc_path)
+		
+		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
+		with open(data_path, "r") as data_file:
+			data = json.load(data_file)
+		x, y = data[0]
+		
+		tile_data = data[1]
+		
+		for group in range(len(tile_data)):
+			for index in range(len(tile_data[0])):
+				res = config.get_bit(x, y, group, index)
+				expected = tile_data[group][index]
+				self.assertEqual(expected, res)
+	
 	def test_get_bits(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
 		config = Configuration.create_from_asc(asc_path)
@@ -163,6 +180,20 @@ class ConfigurationTest(unittest.TestCase):
 			expected = tuple(tile_data[b.group][b.index] for b in bits)
 			values = config.get_bits(tile_pos, bits)
 			self.assertEqual(expected, values)
+	
+	def test_set_bit(self):
+		test_data = (
+			(0, 1, 7, 17, True),
+			(25, 7, 7, 17, False),
+			(15, 16, 15, 38, True)
+		)
+		
+		config = Configuration.create_blank()
+		
+		for args in test_data:
+			config.set_bit(*args)
+			res = config.get_bit(*args[:-1])
+			self.assertEqual(args[-1], res)
 	
 	def test_set_bits(self):
 		test_data = (
