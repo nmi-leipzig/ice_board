@@ -204,7 +204,7 @@ class ManagedFPGABoard(FPGABoard):
 	
 	def __exit__(self, exc_type, exc_value, traceback):
 		# leave connections open even if context is left
-		pass
+		return False
 	
 	def close(self):
 		self._log.debug("close {}".format(self.serial_number))
