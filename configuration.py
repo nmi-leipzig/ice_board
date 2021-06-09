@@ -4,7 +4,7 @@ import os
 from array import array
 import timeit
 import enum
-from typing import NamedTuple, TextIO, Iterable, Tuple, List
+from typing import BinaryIO, Iterable, List, NamedTuple, TextIO, Tuple
 
 from .device_data import SPECS_BY_ASC, TileType, BRAMMode, DeviceSpec, TilePosition, Bit
 
@@ -12,6 +12,10 @@ class ExtraBit(NamedTuple):
 	bank: int
 	x: int
 	y: int
+
+class MalformedBitstreamError(Exception):
+	"""Raised when an not incorrect bitstream is encountered."""
+	pass
 
 TILE_TYPE_TO_ASC_ENTRY = {
 	TileType.LOGIC: "logic_tile",
@@ -250,6 +254,125 @@ class Configuration:
 		
 		for extra_bit in self._extra_bits:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
+	
+	def read_opcodes(self, bin_file: BinaryIO) -> List[Tuple[int, int, int]]:
+		self.expect_bytes(bin_file, b"\xff\x00", "Didn't start with {exp}, but {val}")
+		
+		# read multiple null terminated comment
+		com_list = []
+		prv = b"\x00" # from 0xFF00
+		cur = self.get_bytes(bin_file, 1)
+		while True:
+			while cur != b"\x00":
+				com_list.append(cur)
+				prv = cur
+				cur = self.get_bytes(bin_file, 1)
+			
+			nxt = self.get_bytes(bin_file, 1)
+			if nxt == b"\xff":
+				if prv == b"\x00":
+					# previous string null terminated and received 0x00FF
+					# -> normal end of comment
+					break
+				else:
+					# previous string not null terminated
+					# -> Lattice bug that shifts 0x00FF some bytes into comments
+					com_list.append(b"\n")
+					break
+			else:
+				# another comment string
+				prv = cur
+				cur = nxt
+			com_list.append(b"\n")
+		
+		self.comment = b"".join(com_list).decode("utf-8")
+		
+		# as Lattice' own tools create faulty comments just search for preamble instead of expecting it
+		last_four = [None]*4
+		while last_four != [b"\x7e", b"\xaa", b"\x99", b"\x7e"]:
+			last_four = last_four[1:]
+			last_four.append(self.get_bytes(bin_file, 1))
+		
+		print(f"found preamble at {bin_file.tell()-4}")
+		
+		block_nr = None
+		block_width = None
+		block_height = None
+		block_offset = None
+		
+		res = []
+		def get_data_len():
+			try:
+				return block_width*block_height//8
+			except TypeError as te:
+				raise MalformedBitstreamError("Block height and width have to be set before writig data") from te
+		
+		while True:
+			file_offset = bin_file.tell()
+			command = bin_file.read(1)
+			if len(command) == 0:
+				# end of file
+				break
+			
+			opcode = command[0] >> 4
+			payload_len = command[0] & 0xf
+			
+			payload_bytes = self.get_bytes(bin_file, payload_len)
+			payload = 0
+			for val in payload_bytes:
+				payload = payload << 8 | val
+			
+			print(f"found command at {file_offset}: 0x{command[0]:02x} 0x{payload:0{payload_len*2}x}")
+			res.append((file_offset, command[0], payload))
+			
+			if opcode == 0:
+				if payload == 1:
+					data_len = get_data_len()
+					data = self.get_bytes(bin_file, data_len)
+					self.expect_bytes(bin_file, b"\x00\x00", "Expected 0x{exp:04x} after CRAM data, got 0x{val:04x}")
+					print(f"\tCRAM data {data_len} bytes")
+				elif payload == 3:
+					data_len = get_data_len()
+					data = self.get_bytes(bin_file, data_len)
+					self.expect_bytes(bin_file, b"\x00\x00", "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
+					print(f"\tBRAM data {data_len} bytes")
+				elif payload == 6:
+					# wakeup -> ignore everything after that
+					break
+			elif opcode == 1:
+				block_nr = payload
+			#elif opcode == 2:
+			#	
+			#	pass
+			#elif opcode == 5:
+			#	
+			elif opcode == 6:
+				block_width = payload + 1
+			elif opcode == 7:
+				block_height = payload
+			elif opcode == 8:
+				block_offset = payload
+			#elif opcode == 9:
+			#	
+			# opcode 4 (set boot address) not supported
+		
+		return res
+	
+	@classmethod
+	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, msg: str="Expected {exp} but got {val}") -> None:
+		val = cls.get_bytes(bin_file, len(exp))
+		
+		if exp != val:
+			raise MalformedBitstreamError(msg.format(exp=exp, val=val))
+	
+	@staticmethod
+	def get_bytes(bin_file: BinaryIO, size: int) -> bytes:
+		res = bin_file.read(size)
+		
+		if len(res) < size:
+			raise EOFError()
+		
+		return res
 	
 	@staticmethod
 	def get_line(file_obj) -> str:
