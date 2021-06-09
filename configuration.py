@@ -51,6 +51,9 @@ TILE_TYPE_TO_ASC_ENTRY = {
 
 ASC_ENTRY_TO_TILE_TYPE = {a:t for t, a in TILE_TYPE_TO_ASC_ENTRY.items()}
 
+NOSLEEP_MASK = 1
+WARMBOOT_MASK = 1<<5
+
 class Configuration:
 	"""represents the configuration of a FPGA"""
 	
@@ -372,6 +375,7 @@ class Configuration:
 					# wakeup -> ignore everything after that
 					break
 				else:
+					# payload 8 (reboot) not supported
 					raise MalformedBitstreamError(f"Unsupported Command: 0x{command:02x} 0x{payload:0{payload_len*2}x}")
 			elif opcode == 1:
 				block_nr = payload
@@ -389,8 +393,9 @@ class Configuration:
 				block_height = payload
 			elif opcode == 8:
 				block_offset = payload
-			#elif opcode == 9:
-			#	
+			elif opcode == 9:
+				self._nosleep = (payload & NOSLEEP_MASK) != 0
+				self._warmboot = (payload & WARMBOOT_MASK) != 0
 			# opcode 4 (set boot address) not supported
 		
 		return res
