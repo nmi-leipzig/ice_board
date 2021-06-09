@@ -14,6 +14,16 @@ class ExtraBit(NamedTuple):
 	x: int
 	y: int
 
+class FreqRange(enum.IntEnum):
+	"""Values for internal oscillator frequncy range
+	
+	Relevant for configuration in SPI master mode.
+	Depends on thr PROM speed.
+	"""
+	LOW = 0
+	MEDIUM = 1
+	HIGH = 2
+
 class MalformedBitstreamError(Exception):
 	"""Raised when an not incorrect bitstream is encountered."""
 	pass
@@ -54,6 +64,7 @@ class Configuration:
 		self._tiles_by_type = {}
 		self._tile_types = {}
 		self._comment = ""
+		self._freq_range = FreqRange.LOW
 		self._warmboot = True
 		self._nosleep = False
 		self._extra_bits = []
@@ -367,8 +378,11 @@ class Configuration:
 			elif opcode == 2:
 				if crc.value != 0:
 					raise MalformedBitstreamError(f"Wrong CRC is {crc.value:04x}")
-			#elif opcode == 5:
-			#	
+			elif opcode == 5:
+				try:
+					self._freq_range = FreqRange(payload)
+				except ValueError as ve:
+					raise MalformedBitstreamError(f"Unknown  value for frequency range {payload}") from ve
 			elif opcode == 6:
 				block_width = payload + 1
 			elif opcode == 7:
