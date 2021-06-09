@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import binascii
 import os
 from array import array
 import timeit
@@ -16,6 +17,20 @@ class ExtraBit(NamedTuple):
 class MalformedBitstreamError(Exception):
 	"""Raised when an not incorrect bitstream is encountered."""
 	pass
+
+class CRC:
+	def __init__(self) -> None:
+		self.reset()
+	
+	@property
+	def value(self) -> int:
+		return self._value
+	
+	def reset(self) -> None:
+		self._value = 0xFFFF
+	
+	def update(self, data: bytes) -> None:
+		self._value = binascii.crc_hqx(data, self._value)
 
 TILE_TYPE_TO_ASC_ENTRY = {
 	TileType.LOGIC: "logic_tile",
@@ -256,19 +271,20 @@ class Configuration:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
 	def read_opcodes(self, bin_file: BinaryIO) -> List[Tuple[int, int, int]]:
-		self.expect_bytes(bin_file, b"\xff\x00", "Didn't start with {exp}, but {val}")
+		crc = CRC()
+		self.expect_bytes(bin_file, b"\xff\x00", crc, "Didn't start with {exp}, but {val}")
 		
 		# read multiple null terminated comment
 		com_list = []
 		prv = b"\x00" # from 0xFF00
-		cur = self.get_bytes(bin_file, 1)
+		cur = self.get_bytes_crc(bin_file, 1, crc)
 		while True:
 			while cur != b"\x00":
 				com_list.append(cur)
 				prv = cur
-				cur = self.get_bytes(bin_file, 1)
+				cur = self.get_bytes_crc(bin_file, 1, crc)
 			
-			nxt = self.get_bytes(bin_file, 1)
+			nxt = self.get_bytes_crc(bin_file, 1, crc)
 			if nxt == b"\xff":
 				if prv == b"\x00":
 					# previous string null terminated and received 0x00FF
@@ -291,7 +307,7 @@ class Configuration:
 		last_four = [None]*4
 		while last_four != [b"\x7e", b"\xaa", b"\x99", b"\x7e"]:
 			last_four = last_four[1:]
-			last_four.append(self.get_bytes(bin_file, 1))
+			last_four.append(self.get_bytes_crc(bin_file, 1, crc))
 		
 		print(f"found preamble at {bin_file.tell()-4}")
 		
@@ -309,15 +325,17 @@ class Configuration:
 		
 		while True:
 			file_offset = bin_file.tell()
+			# don't use get_bytes as the end of the file should be detected here
 			command = bin_file.read(1)
 			if len(command) == 0:
 				# end of file
 				break
+			crc.update(command)
 			
 			opcode = command[0] >> 4
 			payload_len = command[0] & 0xf
 			
-			payload_bytes = self.get_bytes(bin_file, payload_len)
+			payload_bytes = self.get_bytes_crc(bin_file, payload_len, crc)
 			payload = 0
 			for val in payload_bytes:
 				payload = payload << 8 | val
@@ -328,22 +346,24 @@ class Configuration:
 			if opcode == 0:
 				if payload == 1:
 					data_len = get_data_len()
-					data = self.get_bytes(bin_file, data_len)
-					self.expect_bytes(bin_file, b"\x00\x00", "Expected 0x{exp:04x} after CRAM data, got 0x{val:04x}")
+					data = self.get_bytes_crc(bin_file, data_len, crc)
+					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after CRAM data, got 0x{val:04x}")
 					print(f"\tCRAM data {data_len} bytes")
 				elif payload == 3:
 					data_len = get_data_len()
-					data = self.get_bytes(bin_file, data_len)
-					self.expect_bytes(bin_file, b"\x00\x00", "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
+					data = self.get_bytes_crc(bin_file, data_len, crc)
+					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
 					print(f"\tBRAM data {data_len} bytes")
+				elif payload == 5:
+					crc.reset()
 				elif payload == 6:
 					# wakeup -> ignore everything after that
 					break
 			elif opcode == 1:
 				block_nr = payload
-			#elif opcode == 2:
-			#	
-			#	pass
+			elif opcode == 2:
+				if crc.value != 0:
+					raise MalformedBitstreamError(f"Wrong CRC is {crc.value:04x}")
 			#elif opcode == 5:
 			#	
 			elif opcode == 6:
@@ -359,11 +379,18 @@ class Configuration:
 		return res
 	
 	@classmethod
-	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, msg: str="Expected {exp} but got {val}") -> None:
-		val = cls.get_bytes(bin_file, len(exp))
+	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
+		val = cls.get_bytes_crc(bin_file, len(exp), crc)
 		
 		if exp != val:
 			raise MalformedBitstreamError(msg.format(exp=exp, val=val))
+	
+	@classmethod
+	def get_bytes_crc(cls, bin_file: BinaryIO, size: int, crc: CRC) -> bytes:
+		"""Get a specific number of bytes and update a CRC"""
+		res = cls.get_bytes(bin_file, size)
+		crc.update(res)
+		return res
 	
 	@staticmethod
 	def get_bytes(bin_file: BinaryIO, size: int) -> bytes:
