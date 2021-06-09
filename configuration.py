@@ -386,7 +386,7 @@ class Configuration:
 				try:
 					self._freq_range = FreqRange(payload)
 				except ValueError as ve:
-					raise MalformedBitstreamError(f"Unknown  value for frequency range {payload}") from ve
+					raise MalformedBitstreamError(f"Unknown value for frequency range {payload}") from ve
 			elif opcode == 6:
 				block_width = payload + 1
 			elif opcode == 7:
@@ -396,7 +396,9 @@ class Configuration:
 			elif opcode == 9:
 				self._nosleep = (payload & NOSLEEP_MASK) != 0
 				self._warmboot = (payload & WARMBOOT_MASK) != 0
-			# opcode 4 (set boot address) not supported
+			else:
+				# opcode 4 (set boot address) not supported
+				raise MalformedBitstreamError(f"Unknown opcode {opcode:1x}")
 		
 		return res
 	
