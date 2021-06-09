@@ -326,22 +326,23 @@ class Configuration:
 		while True:
 			file_offset = bin_file.tell()
 			# don't use get_bytes as the end of the file should be detected here
-			command = bin_file.read(1)
-			if len(command) == 0:
+			raw_com = bin_file.read(1)
+			if len(raw_com) == 0:
 				# end of file
 				break
-			crc.update(command)
+			crc.update(raw_com)
 			
-			opcode = command[0] >> 4
-			payload_len = command[0] & 0xf
+			command = raw_com[0]
+			opcode = command >> 4
+			payload_len = command & 0xf
 			
 			payload_bytes = self.get_bytes_crc(bin_file, payload_len, crc)
 			payload = 0
 			for val in payload_bytes:
 				payload = payload << 8 | val
 			
-			print(f"found command at {file_offset}: 0x{command[0]:02x} 0x{payload:0{payload_len*2}x}")
-			res.append((file_offset, command[0], payload))
+			print(f"found command at {file_offset}: 0x{command:02x} 0x{payload:0{payload_len*2}x}")
+			res.append((file_offset, command, payload))
 			
 			if opcode == 0:
 				if payload == 1:
@@ -359,6 +360,8 @@ class Configuration:
 				elif payload == 6:
 					# wakeup -> ignore everything after that
 					break
+				else:
+					raise MalformedBitstreamError(f"Unsupported Command: 0x{command:02x} 0x{payload:0{payload_len*2}x}")
 			elif opcode == 1:
 				block_nr = payload
 			elif opcode == 2:
