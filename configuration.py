@@ -284,7 +284,22 @@ class Configuration:
 		for extra_bit in self._extra_bits:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
-	def read_opcodes(self, bin_file: BinaryIO) -> List[Tuple[int, int, int]]:
+	def _blank_bram_bank(self) -> Tuple[List[bool], ...]:
+		"""Create a single BRAM bank as used in binary bitstreams with all bits set to 0.
+		
+		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
+		"""
+		return tuple([False]*self._spec.bram_width for _ in range(self._spec.bram_height))
+	
+	def _all_blank_bram_banks(self) -> Tuple[Tuple[List[bool], ...], ...]:
+		"""Create a single BRAM bank as used in binary bitstreams with all bits set to 0.
+		
+		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
+		x dimension.
+		"""
+		return tuple(self._blank_bram_bank() for _ in range(4))
+	
+	def read_bin(self, bin_file: BinaryIO):
 		crc = CRC()
 		self.expect_bytes(bin_file, b"\xff\x00", crc, "Didn't start with {exp}, but {val}")
 		
@@ -325,18 +340,18 @@ class Configuration:
 		
 		print(f"found preamble at {bin_file.tell()-4}")
 		
-		block_nr = None
-		block_width = None
-		block_height = None
-		block_offset = None
+		bank_nr = None
+		bank_width = None
+		bank_height = None
+		bank_offset = None
 		
-		res = []
 		def get_data_len():
 			try:
-				return block_width*block_height//8
+				return bank_width*bank_height//8
 			except TypeError as te:
 				raise MalformedBitstreamError("Block height and width have to be set before writig data") from te
 		
+		bram = self._all_blank_bram_banks()
 		while True:
 			file_offset = bin_file.tell()
 			# don't use get_bytes as the end of the file should be detected here
@@ -356,7 +371,6 @@ class Configuration:
 				payload = payload << 8 | val
 			
 			print(f"found command at {file_offset}: 0x{command:02x} 0x{payload:0{payload_len*2}x}")
-			res.append((file_offset, command, payload))
 			
 			if opcode == 0:
 				if payload == 1:
@@ -367,6 +381,12 @@ class Configuration:
 				elif payload == 3:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
+					for y in range(bank_height):
+						# msb first
+						bit_data = [
+							(b<<i) & 0x80 != 0 for b in data[y*bank_width//8:(y+1)*bank_width//8] for i in range(8)
+						]
+						bram[bank_nr][y+bank_offset][0:bank_width] = bit_data
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
 					print(f"\tBRAM data {data_len} bytes")
 				elif payload == 5:
@@ -378,7 +398,7 @@ class Configuration:
 					# payload 8 (reboot) not supported
 					raise MalformedBitstreamError(f"Unsupported Command: 0x{command:02x} 0x{payload:0{payload_len*2}x}")
 			elif opcode == 1:
-				block_nr = payload
+				bank_nr = payload
 			elif opcode == 2:
 				if crc.value != 0:
 					raise MalformedBitstreamError(f"Wrong CRC is {crc.value:04x}")
@@ -388,11 +408,11 @@ class Configuration:
 				except ValueError as ve:
 					raise MalformedBitstreamError(f"Unknown value for frequency range {payload}") from ve
 			elif opcode == 6:
-				block_width = payload + 1
+				bank_width = payload + 1
 			elif opcode == 7:
-				block_height = payload
+				bank_height = payload
 			elif opcode == 8:
-				block_offset = payload
+				bank_offset = payload
 			elif opcode == 9:
 				self._nosleep = (payload & NOSLEEP_MASK) != 0
 				self._warmboot = (payload & WARMBOOT_MASK) != 0
@@ -400,7 +420,24 @@ class Configuration:
 				# opcode 4 (set boot address) not supported
 				raise MalformedBitstreamError(f"Unknown opcode {opcode:1x}")
 		
-		return res
+		# write BRAM bank data to ram tile data
+		for bank_nr, bram_bank in enumerate(bram):
+			top = bank_nr%2 == 1
+			tile_x = self._spec.bram_cols[bank_nr//2]
+			for block_nr in range(self._spec.bram_width//16):
+				tile_y = block_nr*2 + 1
+				if top:
+					# in fact it should be (max_y-1)//2 but as max_y is always odd it yields the same result
+					tile_y += self._spec.max_y//2
+				bram_data = self._bram[TilePosition(tile_x, tile_y)]
+				
+				for bank_y, bram_row in enumerate(bram_bank):
+					# bank_y equals word address in ram tile data
+					col_index = bank_y % 16
+					row_index = bank_y // 16
+					bram_data[row_index][col_index*16:(col_index+1)*16] = reversed(bram_row[block_nr*16:(block_nr+1)*16])
+		
+		#print(bram)
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:

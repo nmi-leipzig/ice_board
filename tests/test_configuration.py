@@ -262,55 +262,31 @@ class ConfigurationTest(unittest.TestCase):
 				self.assert_structural_equal(asc_file_a, asc_file_b)
 		
 	
-	def test_read_opcodes(self):
-		# test if the correct opcodes of a binar bitstream are identified
-		exp = [
-			(88, 0x51, 0x00),
-			(90, 0x01, 0x05),
-			(92, 0x92, 0x0020),
-			(95, 0x62, 0x0367),
-			(98, 0x72, 0x0110),
-			(101, 0x82, 0x0000),
-			(104, 0x11, 0x00),
-			(106, 0x01, 0x01),
-			(29758, 0x11, 0x01),
-			(29760, 0x01, 0x01),
-			(59412, 0x11, 0x02),
-			(59414, 0x01, 0x01),
-			(89066, 0x11, 0x03),
-			(89068, 0x01, 0x01),
-			(118720, 0x62, 0x007f),
-			(118723, 0x72, 0x0080),
-			(118726, 0x11, 0x00),
-			(118728, 0x82, 0x0000),
-			(118731, 0x01, 0x03),
-			(120783, 0x82, 0x0080),
-			(120786, 0x01, 0x03),
-			(122838, 0x11, 0x01),
-			(122840, 0x82, 0x0000),
-			(122843, 0x01, 0x03),
-			(124895, 0x82, 0x0080),
-			(124898, 0x01, 0x03),
-			(126950, 0x11, 0x02),
-			(126952, 0x82, 0x0000),
-			(126955, 0x01, 0x03),
-			(129007, 0x82, 0x0080),
-			(129010, 0x01, 0x03),
-			(131062, 0x11, 0x03),
-			(131064, 0x82, 0x0000),
-			(131067, 0x01, 0x03),
-			(133119, 0x82, 0x0080),
-			(133122, 0x01, 0x03),
-			(135174, 0x22, 0xb399),
-			(135177, 0x01, 0x06),
-		]
-		# compare to known data
-		bin_path = self.get_data("echo.bin", must_exist=True)
+	def test_read_bin(self):
+		bin_path = self.get_data("send_all_bram.512x8.bin", must_exist=True)
 		
 		dut = Configuration.create_blank()
 		with open(bin_path, "rb") as bin_file:
-			res = dut.read_opcodes(bin_file)
-			self.assertEqual(exp, res)
+			dut.read_bin(bin_file)
+		
+		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
+		with open(data_path, "r") as data_file:
+			data = json.load(data_file)
+		
+		# check logic cell
+		#tile_pos = TilePosition(*data[0])
+		#tile_data = tuple(data[1])
+		
+		#self.assertEqual(tile_data, config._tiles[tile_pos])
+		
+		# check bram
+		bram_pos = TilePosition(*data[2])
+		bram_data = tuple(data[3])
+		
+		self.assertEqual(bram_data, dut._bram[bram_pos][:len(bram_data)])
+		rest = tuple([False]*len(bram_data[0]) for _ in range(len(dut._bram[bram_pos])-len(bram_data)))
+		self.assertEqual(rest, dut._bram[bram_pos][len(bram_data):])
+		
 	
 	def assert_structural_equal(self, asc_file_a, asc_file_b):
 		parts_a = self.load_asc_parts(asc_file_a)
