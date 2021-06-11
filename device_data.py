@@ -28,7 +28,7 @@ class DeviceSpec:
 	bram_width: int
 	bram_height: int
 	
-	bram_cols: Tuple[int]
+	bram_cols: Tuple[int, ...]
 	tile_type_width: Dict[TileType, int]
 	
 	
