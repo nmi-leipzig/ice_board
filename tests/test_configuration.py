@@ -262,14 +262,14 @@ class ConfigurationTest(unittest.TestCase):
 				self.assert_structural_equal(asc_file_a, asc_file_b)
 		
 	
-	def test_read_bin(self):
-		bin_path = self.get_data("send_all_bram.512x8.bin", must_exist=True)
+	def generic_read_bin_test(self, base_name):
+		bin_path = self.get_data(f"{base_name}.bin", must_exist=True)
 		
 		dut = Configuration.create_blank()
 		with open(bin_path, "rb") as bin_file:
 			dut.read_bin(bin_file)
 		
-		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
+		data_path = self.get_data(f"{base_name}.json", must_exist=True)
 		with open(data_path, "r") as data_file:
 			data = json.load(data_file)
 		
@@ -287,6 +287,10 @@ class ConfigurationTest(unittest.TestCase):
 		rest = tuple([False]*len(bram_data[0]) for _ in range(len(dut._bram[bram_pos])-len(bram_data)))
 		self.assertEqual(rest, dut._bram[bram_pos][len(bram_data):])
 		
+	def test_read_bin(self):
+		for base_name in ["send_all_bram.512x8", "send_all_bram.256x16.25_27"]:
+			with self.subTest(base_name=base_name):
+				self.generic_read_bin_test(base_name)
 	
 	def assert_structural_equal(self, asc_file_a, asc_file_b):
 		parts_a = self.load_asc_parts(asc_file_a)
