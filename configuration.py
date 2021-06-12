@@ -284,6 +284,21 @@ class Configuration:
 		for extra_bit in self._extra_bits:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
+	def _blank_cram_bank(self) -> Tuple[List[bool], ...]:
+		"""Create a single CRAM bank as used in binary bitstreams with all bits set to 0.
+		
+		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
+		"""
+		return tuple([False]*self._spec.cram_width for _ in range(self._spec.cram_height))
+	
+	def _all_blank_cram_banks(self) -> Tuple[Tuple[List[bool], ...]]:
+		"""Create all CRAM banks as used in binary bitstreams with all bits set to 0.
+		
+		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
+		x dimension.
+		"""
+		return tuple(self._blank_cram_bank() for _ in range(4))
+	
 	def _blank_bram_bank(self) -> Tuple[List[bool], ...]:
 		"""Create a single BRAM bank as used in binary bitstreams with all bits set to 0.
 		
@@ -292,7 +307,7 @@ class Configuration:
 		return tuple([False]*self._spec.bram_width for _ in range(self._spec.bram_height))
 	
 	def _all_blank_bram_banks(self) -> Tuple[Tuple[List[bool], ...], ...]:
-		"""Create a single BRAM bank as used in binary bitstreams with all bits set to 0.
+		"""Create all BRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
 		x dimension.
@@ -351,6 +366,16 @@ class Configuration:
 			except TypeError as te:
 				raise MalformedBitstreamError("Block height and width have to be set before writig data") from te
 		
+		def data_to_xram(data, xram):
+			for y in range(bank_height):
+				# msb first
+				bit_data = [
+					(b<<i) & 0x80 != 0 for b in data[y*bank_width//8:(y+1)*bank_width//8] for i in range(8)
+				]
+				xram[bank_nr][y+bank_offset][0:bank_width] = bit_data
+			
+		
+		cram = self._all_blank_cram_banks()
 		bram = self._all_blank_bram_banks()
 		while True:
 			file_offset = bin_file.tell()
@@ -376,17 +401,13 @@ class Configuration:
 				if payload == 1:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
+					data_to_xram(data, cram)
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after CRAM data, got 0x{val:04x}")
 					print(f"\tCRAM data {data_len} bytes")
 				elif payload == 3:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
-					for y in range(bank_height):
-						# msb first
-						bit_data = [
-							(b<<i) & 0x80 != 0 for b in data[y*bank_width//8:(y+1)*bank_width//8] for i in range(8)
-						]
-						bram[bank_nr][y+bank_offset][0:bank_width] = bit_data
+					data_to_xram(data, bram)
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
 					print(f"\tBRAM data {data_len} bytes")
 				elif payload == 5:
@@ -419,6 +440,12 @@ class Configuration:
 			else:
 				# opcode 4 (set boot address) not supported
 				raise MalformedBitstreamError(f"Unknown opcode {opcode:1x}")
+		
+		# write CRAM bank data to tiles
+		for bank_nr, cram_bank in enumerate(cram):
+			top = bank_nr%2 == 1
+			right = bank_nr >= 2
+			
 		
 		# write BRAM bank data to ram tile data
 		for bank_nr, bram_bank in enumerate(bram):
