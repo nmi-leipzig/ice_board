@@ -17,6 +17,12 @@ class Bit(NamedTuple):
 	group: int
 	index: int
 
+class ExtraBit(NamedTuple):
+	"""Bit in the CRAM that is not associated with a tile"""
+	bank: int
+	x: int
+	y: int
+
 @dataclass(frozen=True)
 class DeviceSpec:
 	asc_name: str
@@ -30,7 +36,7 @@ class DeviceSpec:
 	
 	bram_cols: Tuple[int, ...]
 	tile_type_width: Dict[TileType, int]
-	
+	extra_bits: Tuple[ExtraBit, ...]
 	
 	tile_height: int = 16
 	
@@ -66,7 +72,11 @@ SPECS = (
 		128,
 		256,
 		(8, 25),
-		{TileType.IO: 18, TileType.RAM_T: 42, TileType.RAM_B: 42, TileType.LOGIC: 54}
+		{TileType.IO: 18, TileType.RAM_T: 42, TileType.RAM_B: 42, TileType.LOGIC: 54},
+		(
+			ExtraBit(0, 870, 270), ExtraBit(0, 871, 270), ExtraBit(1, 870, 271), ExtraBit(1, 871, 271),
+			ExtraBit(1, 870, 270), ExtraBit(1, 871, 270), ExtraBit(0, 870, 271), ExtraBit(0, 871, 271), 
+		),
 	),
 )
 
