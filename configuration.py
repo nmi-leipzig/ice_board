@@ -348,8 +348,6 @@ class Configuration:
 			last_four = last_four[1:]
 			last_four.append(self.get_bytes_crc(bin_file, 1, crc))
 		
-		print(f"found preamble at {bin_file.tell()-4}")
-		
 		bank_nr = None
 		bank_width = None
 		bank_height = None
@@ -390,21 +388,17 @@ class Configuration:
 			for val in payload_bytes:
 				payload = payload << 8 | val
 			
-			print(f"found command at {file_offset}: 0x{command:02x} 0x{payload:0{payload_len*2}x}")
-			
 			if opcode == 0:
 				if payload == 1:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, cram)
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after CRAM data, got 0x{val:04x}")
-					print(f"\tCRAM data {data_len} bytes")
 				elif payload == 3:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, bram)
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
-					print(f"\tBRAM data {data_len} bytes")
 				elif payload == 5:
 					crc.reset()
 				elif payload == 6:
@@ -440,7 +434,6 @@ class Configuration:
 		for bank_nr, cram_bank in enumerate(cram):
 			top = bank_nr%2 == 1
 			right = bank_nr >= 2
-			#print(f"bank {bank_nr}, top {top}, right {right}")
 			
 			if top:
 				y_range = list(reversed(range((self._spec.max_y+1)//2, self._spec.max_y)))
@@ -477,7 +470,6 @@ class Configuration:
 				x_off = 0
 				for tile_x in x_range:
 					tile_pos = TilePosition(tile_x, tile_y)
-					#print(tile_pos)
 					tile_data = self._tiles[tile_pos]
 					tile_type = self._tile_types[tile_pos]
 					tile_width = self._spec.tile_type_width[tile_type]
@@ -518,7 +510,6 @@ class Configuration:
 					row_index = bank_y // 16
 					bram_data[row_index][col_index*16:(col_index+1)*16] = reversed(bram_row[block_nr*16:(block_nr+1)*16])
 		
-		#print(bram)
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:

@@ -277,11 +277,6 @@ class ConfigurationTest(unittest.TestCase):
 		tile_pos = TilePosition(*data[0])
 		tile_data = tuple(data[1])
 		
-		#self.maxDiff = None
-		#for exp, res in zip(tile_data, dut._tiles[tile_pos]):
-		#	print(exp)
-		#	print(res)
-		#	print()
 		with open(f"tmp.{base_name}.asc", "w") as asc_out:
 			dut.write_asc(asc_out)
 		self.assertEqual(tile_data, dut._tiles[tile_pos])
