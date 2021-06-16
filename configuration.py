@@ -7,12 +7,7 @@ import timeit
 import enum
 from typing import BinaryIO, Iterable, List, NamedTuple, TextIO, Tuple
 
-from .device_data import SPECS_BY_ASC, TileType, BRAMMode, DeviceSpec, TilePosition, Bit
-
-class ExtraBit(NamedTuple):
-	bank: int
-	x: int
-	y: int
+from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
 
 class FreqRange(enum.IntEnum):
 	"""Values for internal oscillator frequncy range
@@ -345,7 +340,7 @@ class Configuration:
 				cur = nxt
 			com_list.append(b"\n")
 		
-		self.comment = b"".join(com_list).decode("utf-8")
+		self._comment = b"".join(com_list).decode("utf-8")
 		
 		# as Lattice' own tools create faulty comments just search for preamble instead of expecting it
 		last_four = [None]*4
@@ -445,7 +440,66 @@ class Configuration:
 		for bank_nr, cram_bank in enumerate(cram):
 			top = bank_nr%2 == 1
 			right = bank_nr >= 2
+			#print(f"bank {bank_nr}, top {top}, right {right}")
 			
+			if top:
+				y_range = list(reversed(range((self._spec.max_y+1)//2, self._spec.max_y)))
+				io_y = self._spec.max_y
+			else:
+				y_range = list(range(1, (self._spec.max_y+1)//2))
+				io_y = 0
+			
+			if right:
+				x_range = list(reversed(range((self._spec.max_x+1)//2, self._spec.max_x+1)))
+			else:
+				x_range = list(range((self._spec.max_x+1)//2))
+			
+			# IO in x direction
+			x_off = self._spec.tile_type_width[self._tile_types[TilePosition(x_range[0], y_range[0])]]
+			io_width = self._spec.tile_type_width[TileType.IO]
+			for tile_x in x_range[1:]:
+				# width is defined by the other tile i the row, not the IO tile
+				row_width = self._spec.tile_type_width[self._tile_types[TilePosition(tile_x, y_range[0])]]
+				
+				tile_data = self._tiles[TilePosition(tile_x, io_y)]
+				
+				cram_indices = [23, 25, 26, 27, 16, 17, 18, 19, 20, 14, 32, 33, 34, 35, 36, 37, 4, 5]
+				if right:
+					cram_indices = [row_width-1-i for i in cram_indices]
+				
+				for group, cram_y in enumerate([15, 14, 12, 13, 11, 10, 8, 9, 7, 6, 4, 5, 3, 2, 0, 1]):
+					tile_data[group][0:io_width] = [cram_bank[cram_y][x_off+i] for i in cram_indices]
+				
+				x_off += row_width
+			
+			y_off = self._spec.tile_height
+			for tile_y in y_range:
+				x_off = 0
+				for tile_x in x_range:
+					tile_pos = TilePosition(tile_x, tile_y)
+					#print(tile_pos)
+					tile_data = self._tiles[tile_pos]
+					tile_type = self._tile_types[tile_pos]
+					tile_width = self._spec.tile_type_width[tile_type]
+					
+					raw_group = lambda d: d[x_off:x_off+tile_width]
+					extract_group = raw_group
+					if right or tile_type == TileType.IO:
+						extract_group = lambda d: reversed(raw_group(d))
+					
+					cram_y_range = range(y_off, y_off+self._spec.tile_height)
+					if top:
+						cram_y_range = reversed(cram_y_range)
+					
+					for group, cram_y in enumerate(cram_y_range):
+						tile_data[group][0:tile_width] = extract_group(cram_bank[cram_y])
+					
+					x_off += tile_width
+				y_off += self._spec.tile_height
+		# extra bits
+		for extra in self._spec.extra_bits:
+			if cram[extra.bank][extra.y][extra.x]:
+				self._extra_bits.append(extra)
 		
 		# write BRAM bank data to ram tile data
 		for bank_nr, bram_bank in enumerate(bram):

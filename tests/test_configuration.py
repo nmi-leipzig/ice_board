@@ -274,10 +274,17 @@ class ConfigurationTest(unittest.TestCase):
 			data = json.load(data_file)
 		
 		# check logic cell
-		#tile_pos = TilePosition(*data[0])
-		#tile_data = tuple(data[1])
+		tile_pos = TilePosition(*data[0])
+		tile_data = tuple(data[1])
 		
-		#self.assertEqual(tile_data, config._tiles[tile_pos])
+		#self.maxDiff = None
+		#for exp, res in zip(tile_data, dut._tiles[tile_pos]):
+		#	print(exp)
+		#	print(res)
+		#	print()
+		with open(f"tmp.{base_name}.asc", "w") as asc_out:
+			dut.write_asc(asc_out)
+		self.assertEqual(tile_data, dut._tiles[tile_pos])
 		
 		# check bram
 		bram_pos = TilePosition(*data[2])
@@ -287,10 +294,38 @@ class ConfigurationTest(unittest.TestCase):
 		rest = tuple([False]*len(bram_data[0]) for _ in range(len(dut._bram[bram_pos])-len(bram_data)))
 		self.assertEqual(rest, dut._bram[bram_pos][len(bram_data):])
 		
-	def test_read_bin(self):
+	def test_read_bin_known_bits(self):
 		for base_name in ["send_all_bram.512x8", "send_all_bram.256x16.25_27"]:
 			with self.subTest(base_name=base_name):
 				self.generic_read_bin_test(base_name)
+	
+	def test_read_bin_asc(self):
+		test_files = [
+			("echo.bin", "echo.asc"),
+			("send_all_bram.256x16.25_27.bin", "send_all_bram.256x16.25_27.asc"),
+		]
+		
+		for bin_filename, asc_filename in test_files:
+			with self.subTest(asc=asc_filename):
+				bin_path = self.get_data(bin_filename, must_exist=True)
+				asc_path = self.get_data(asc_filename, must_exist=True)
+				dut = Configuration.create_blank()
+				
+				# read bin
+				with open(bin_path, "rb") as bin_file:
+					dut.read_bin(bin_file)
+				
+				# write asc
+				out_filename = f"tmp.test_read_bin_asc.{bin_filename}.asc"
+				with open(out_filename, "w") as out_file:
+					dut. write_asc(out_file)
+				
+				# compare asc
+				with open(asc_path, "r") as exp_file, open(out_filename, "r") as res_file:
+					self.assert_structural_equal(exp_file, res_file)
+				
+				# clean up
+				os.remove(out_filename)
 	
 	def assert_structural_equal(self, asc_file_a, asc_file_b):
 		parts_a = self.load_asc_parts(asc_file_a)
@@ -304,7 +339,7 @@ class ConfigurationTest(unittest.TestCase):
 		for entry in sorted(parts_a):
 			if entry.name == ".ram_data" and all(all(s=="0" for s in r) for r in parts_a[entry]) and entry not in parts_b:
 				continue
-			self.assertIn(entry, parts_b)
+			self.assertIn(entry, parts_b.keys())
 			self.assertEqual(parts_a[entry], parts_b[entry])
 		
 	
