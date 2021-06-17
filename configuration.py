@@ -438,6 +438,9 @@ class Configuration:
 	def _read_cram_banks(self, cram: Iterable[Bank]) -> None:
 		self._access_cram_banks(cram, True)
 	
+	def _write_cram_banks(self, cram: Iterable[Bank]) -> None:
+		self._access_cram_banks(cram, False)
+	
 	def _access_cram_banks(self, cram: Iterable[Bank], read: bool) -> None:
 		if read:
 			# write CRAM bank data to tiles
@@ -493,9 +496,9 @@ class Configuration:
 					tile_type = self._tile_types[tile_pos]
 					tile_width = self._spec.tile_type_width[tile_type]
 					
-					group_slice = slice(None)
+					group_slice = slice(x_off, x_off+tile_width)
 					if right or tile_type == TileType.IO:
-						group_slice = slice(None, None, -1)
+						group_slice = self.reverse_slice(group_slice)
 					
 					cram_y_range = range(y_off, y_off+self._spec.tile_height)
 					if top:
@@ -504,7 +507,7 @@ class Configuration:
 					for group, cram_y in enumerate(cram_y_range):
 						assign(
 							tile_data[group], slice(0, tile_width),
-							cram_bank[cram_y][x_off:x_off+tile_width], group_slice
+							cram_bank[cram_y], group_slice
 						)
 					
 					x_off += tile_width
@@ -522,6 +525,9 @@ class Configuration:
 	
 	def _read_bram_banks(self, bram: Iterable[Bank]) -> None:
 		self._access_bram_banks(bram, True)
+	
+	def _write_bram_banks(self, bram: Iterable[Bank]) -> None:
+		self._access_bram_banks(bram, False)
 	
 	def _access_bram_banks(self, bram: Iterable[Bank], read: bool) -> None:
 		if read:
@@ -547,8 +553,47 @@ class Configuration:
 					row_index = bank_y // 16
 					assign(
 						bram_data[row_index], slice(col_index*16, (col_index+1)*16),
-						bram_row[block_nr*16:(block_nr+1)*16], slice(None, None, -1)
+						bram_row, self.reverse_slice(slice(block_nr*16, (block_nr+1)*16))
 					)
+	
+	@staticmethod
+	def reverse_slice(org_slice: slice) -> slice:
+		# only tested for |step| == 1
+		step = -(org_slice.step or 1)
+		if step < 0:
+			# org step was positive
+			
+			if org_slice.stop == 0:
+				# special case, always returns empty list
+				return slice(org_slice.start, -1, step)
+			
+			if org_slice.start in (None, 0):
+				stop = None
+			else:
+				stop = org_slice.start - 1
+			
+			if org_slice.stop is None:
+				start = None
+			else:
+				start = org_slice.stop - 1
+		else:
+			# org step was negative
+			
+			if org_slice.stop == -1:
+				# special case, always returns empty list
+				return slice(org_slice.start, 0, step)
+			
+			if org_slice.start in (None, -1):
+				stop = None
+			else:
+				stop = org_slice.start + 1
+			
+			if org_slice.stop is None:
+				start = None
+			else:
+				start = org_slice.stop + 1
+		
+		return slice(start, stop, step)
 	
 	@staticmethod
 	def first_from_second(first: Sequence, first_slice: slice, second: Sequence, second_slice: slice):

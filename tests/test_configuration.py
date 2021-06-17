@@ -337,6 +337,65 @@ class ConfigurationTest(unittest.TestCase):
 				# clean up
 				os.remove(out_filename)
 	
+	def iter_asc_files(self):
+		for asc_filename in [
+			"send_all_bram.256x16.25_27.asc", "send_all_bram.256x16.asc", "send_all_bram.512x8.asc", 
+			"send_all_bram.1024x4.asc", "send_all_bram.2048x2.asc", "echo.asc",
+		]:
+			path = self.get_data(asc_filename, must_exist=True)
+			with open(path, "r") as asc_file:
+				yield asc_file
+	
+	def test_access_bram_matching(self):
+		# test that reading and writing BRAM banks go together
+		for asc_file in self.iter_asc_files():
+			with self.subTest(asc_name=asc_file.name):
+				dut1 = Configuration.create_blank()
+				dut2 = Configuration.create_blank()
+				
+				dut1.read_asc(asc_file)
+				
+				bram = dut1._all_blank_bram_banks()
+				dut1._write_bram_banks(bram)
+				dut2._read_bram_banks(bram)
+				
+				self.assertEqual(dut1._bram.keys(), dut2._bram.keys())
+				for tile, data in dut1._bram.items():
+					self.assertEqual(data, dut2._bram[tile], f"Difference in RAM data at {tile}")
+	
+	def test_access_cram_matching(self):
+		# test that reading and writing CRAM banks go together
+		for asc_file in self.iter_asc_files():
+			with self.subTest(asc_name=asc_file.name):
+				dut1 = Configuration.create_blank()
+				dut2 = Configuration.create_blank()
+				
+				dut1.read_asc(asc_file)
+				
+				cram = dut1._all_blank_cram_banks()
+				dut1._write_cram_banks(cram)
+				dut2._read_cram_banks(cram)
+				
+				self.assertEqual(dut1._tiles.keys(), dut2._tiles.keys())
+				for tile, data in dut1._tiles.items():
+					self.assertEqual(data, dut2._tiles[tile], f"Difference in tile data at {tile}")
+				
+				self.assertEqual(dut1._extra_bits, dut2._extra_bits)
+	
+	def test_reverse_slice(self):
+		for l in range(5):
+			to_slice = list(range(l))
+			for start in range(-l, 2*l):
+				for stop in range(-l, 2*l):
+					org_slice = slice(start, stop, 1)
+					
+					rev_slice = Configuration.reverse_slice(org_slice)
+					exp = list(reversed(to_slice[org_slice]))
+					res = to_slice[rev_slice]
+					
+					self.assertEqual(exp, res)
+		
+	
 	def assert_structural_equal(self, asc_file_a, asc_file_b):
 		parts_a = self.load_asc_parts(asc_file_a)
 		parts_b = self.load_asc_parts(asc_file_b)
