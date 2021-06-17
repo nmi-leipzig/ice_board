@@ -5,9 +5,11 @@ import os
 from array import array
 import timeit
 import enum
-from typing import BinaryIO, Iterable, List, NamedTuple, TextIO, Tuple
+from typing import BinaryIO, Iterable, List, NamedTuple, NewType, TextIO, Tuple
 
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
+
+Bank = NewType("Bank", Tuple[List[bool], ...])
 
 class FreqRange(enum.IntEnum):
 	"""Values for internal oscillator frequncy range
@@ -279,14 +281,14 @@ class Configuration:
 		for extra_bit in self._extra_bits:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
-	def _blank_cram_bank(self) -> Tuple[List[bool], ...]:
+	def _blank_cram_bank(self) -> Bank:
 		"""Create a single CRAM bank as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
 		"""
 		return tuple([False]*self._spec.cram_width for _ in range(self._spec.cram_height))
 	
-	def _all_blank_cram_banks(self) -> Tuple[Tuple[List[bool], ...]]:
+	def _all_blank_cram_banks(self) -> Tuple[Bank, ...]:
 		"""Create all CRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
@@ -294,14 +296,14 @@ class Configuration:
 		"""
 		return tuple(self._blank_cram_bank() for _ in range(4))
 	
-	def _blank_bram_bank(self) -> Tuple[List[bool], ...]:
+	def _blank_bram_bank(self) -> Bank:
 		"""Create a single BRAM bank as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
 		"""
 		return tuple([False]*self._spec.bram_width for _ in range(self._spec.bram_height))
 	
-	def _all_blank_bram_banks(self) -> Tuple[Tuple[List[bool], ...], ...]:
+	def _all_blank_bram_banks(self) -> Tuple[Bank, ...]:
 		"""Create all BRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
@@ -430,6 +432,10 @@ class Configuration:
 				# opcode 4 (set boot address) not supported
 				raise MalformedBitstreamError(f"Unknown opcode {opcode:1x}")
 		
+		self._read_cram_banks(cram)
+		self._read_bram_banks(bram)
+	
+	def _read_cram_banks(self, cram: Iterable[Bank]) -> None:
 		# write CRAM bank data to tiles
 		for bank_nr, cram_bank in enumerate(cram):
 			top = bank_nr%2 == 1
@@ -488,11 +494,13 @@ class Configuration:
 					
 					x_off += tile_width
 				y_off += self._spec.tile_height
+		
 		# extra bits
 		for extra in self._spec.extra_bits:
 			if cram[extra.bank][extra.y][extra.x]:
 				self._extra_bits.append(extra)
-		
+	
+	def _read_bram_banks(self, bram: Iterable[Bank]) -> None:
 		# write BRAM bank data to ram tile data
 		for bank_nr, bram_bank in enumerate(bram):
 			top = bank_nr%2 == 1
@@ -509,7 +517,6 @@ class Configuration:
 					col_index = bank_y % 16
 					row_index = bank_y // 16
 					bram_data[row_index][col_index*16:(col_index+1)*16] = reversed(bram_row[block_nr*16:(block_nr+1)*16])
-		
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
