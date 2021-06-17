@@ -436,7 +436,16 @@ class Configuration:
 		self._read_bram_banks(bram)
 	
 	def _read_cram_banks(self, cram: Iterable[Bank]) -> None:
-		# write CRAM bank data to tiles
+		self._access_cram_banks(cram, True)
+	
+	def _access_cram_banks(self, cram: Iterable[Bank], read: bool) -> None:
+		if read:
+			# write CRAM bank data to tiles
+			assign = self.first_from_second
+		else:
+			# write tiles to CRAM bank
+			assign = self.second_from_first
+		
 		for bank_nr, cram_bank in enumerate(cram):
 			top = bank_nr%2 == 1
 			right = bank_nr >= 2
@@ -467,7 +476,11 @@ class Configuration:
 					cram_indices = [row_width-1-i for i in cram_indices]
 				
 				for group, cram_y in enumerate([15, 14, 12, 13, 11, 10, 8, 9, 7, 6, 4, 5, 3, 2, 0, 1]):
-					tile_data[group][0:io_width] = [cram_bank[cram_y][x_off+i] for i in cram_indices]
+					if read:
+						tile_data[group][0:io_width] = [cram_bank[cram_y][x_off+i] for i in cram_indices]
+					else:
+						for index, cram_x in enumerate(cram_indices):
+							cram_bank[cram_y][x_off+cram_x] = tile_data[group][index]
 				
 				x_off += row_width
 			
@@ -480,25 +493,32 @@ class Configuration:
 					tile_type = self._tile_types[tile_pos]
 					tile_width = self._spec.tile_type_width[tile_type]
 					
-					raw_group = lambda d: d[x_off:x_off+tile_width]
-					extract_group = raw_group
+					group_slice = slice(None)
 					if right or tile_type == TileType.IO:
-						extract_group = lambda d: reversed(raw_group(d))
+						group_slice = slice(None, None, -1)
 					
 					cram_y_range = range(y_off, y_off+self._spec.tile_height)
 					if top:
 						cram_y_range = reversed(cram_y_range)
 					
 					for group, cram_y in enumerate(cram_y_range):
-						tile_data[group][0:tile_width] = extract_group(cram_bank[cram_y])
+						assign(
+							tile_data[group], slice(0, tile_width),
+							cram_bank[cram_y][x_off:x_off+tile_width], group_slice
+						)
 					
 					x_off += tile_width
 				y_off += self._spec.tile_height
 		
 		# extra bits
-		for extra in self._spec.extra_bits:
-			if cram[extra.bank][extra.y][extra.x]:
-				self._extra_bits.append(extra)
+		if read:
+			self._extra_bits = []
+			for extra in self._spec.extra_bits:
+				if cram[extra.bank][extra.y][extra.x]:
+					self._extra_bits.append(extra)
+		else:
+			for extra in self._extra_bits:
+				cram[extra.bank][extra.y][extra.x] = True
 	
 	def _read_bram_banks(self, bram: Iterable[Bank]) -> None:
 		self._access_bram_banks(bram, True)
@@ -527,7 +547,7 @@ class Configuration:
 					row_index = bank_y // 16
 					assign(
 						bram_data[row_index], slice(col_index*16, (col_index+1)*16),
-						bram_row, slice((block_nr+1)*16-1, block_nr*16-1, -1)
+						bram_row[block_nr*16:(block_nr+1)*16], slice(None, None, -1)
 					)
 	
 	@staticmethod
