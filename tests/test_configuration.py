@@ -108,11 +108,11 @@ class ConfigurationTest(unittest.TestCase):
 		res_ic = icebox.iceconfig()
 		res_ic.read_file(out_path)
 		
-		self.check_configuration(expected_ic, res_ic)
+		self.check_iceconfig(expected_ic, res_ic)
 		
 		os.remove(out_path)
 	
-	def check_configuration(self, expected_config, config):
+	def check_iceconfig(self, expected_config, config):
 		# compare two icebox configurations
 		for value_name in ("device", "warmboot"):
 			expected_value = getattr(expected_config, value_name)
@@ -288,7 +288,7 @@ class ConfigurationTest(unittest.TestCase):
 		self.assertEqual(bram_data, dut._bram[bram_pos][:len(bram_data)])
 		rest = tuple([False]*len(bram_data[0]) for _ in range(len(dut._bram[bram_pos])-len(bram_data)))
 		self.assertEqual(rest, dut._bram[bram_pos][len(bram_data):])
-		
+	
 	def test_read_bin_known_bits(self):
 		for base_name in ["send_all_bram.512x8", "send_all_bram.256x16.25_27"]:
 			with self.subTest(base_name=base_name):
