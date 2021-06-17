@@ -5,7 +5,7 @@ import os
 from array import array
 import timeit
 import enum
-from typing import BinaryIO, Iterable, List, NamedTuple, NewType, TextIO, Tuple
+from typing import BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
 
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
 
@@ -501,7 +501,16 @@ class Configuration:
 				self._extra_bits.append(extra)
 	
 	def _read_bram_banks(self, bram: Iterable[Bank]) -> None:
-		# write BRAM bank data to ram tile data
+		self._access_bram_banks(bram, True)
+	
+	def _access_bram_banks(self, bram: Iterable[Bank], read: bool) -> None:
+		if read:
+			# write BRAM bank data to ram tile data
+			assign = self.first_from_second
+		else:
+			# write ram tile data to BRAM bank
+			assign = self.second_from_first
+		
 		for bank_nr, bram_bank in enumerate(bram):
 			top = bank_nr%2 == 1
 			tile_x = self._spec.bram_cols[bank_nr//2]
@@ -516,7 +525,20 @@ class Configuration:
 					# bank_y equals word address in ram tile data
 					col_index = bank_y % 16
 					row_index = bank_y // 16
-					bram_data[row_index][col_index*16:(col_index+1)*16] = reversed(bram_row[block_nr*16:(block_nr+1)*16])
+					assign(
+						bram_data[row_index], slice(col_index*16, (col_index+1)*16),
+						bram_row, slice((block_nr+1)*16-1, block_nr*16-1, -1)
+					)
+	
+	@staticmethod
+	def first_from_second(first: Sequence, first_slice: slice, second: Sequence, second_slice: slice):
+		"""Assign the values from the slice of the second sequence to the slice of the first sequence"""
+		first[first_slice] = second[second_slice]
+	
+	@staticmethod
+	def second_from_first(first: Sequence, first_slice:slice, second: Sequence, second_slice: slice):
+		"""Assign the values from the slice of the first sequence to the slice of the second sequence"""
+		second[second_slice] = first[first_slice]
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
