@@ -139,6 +139,13 @@ class ConfigurationTest(unittest.TestCase):
 			given_col = getattr(config, col_name)
 			self.assertEqual(expected_col, given_col, f"Contents of {col_name} differ from expected values:")
 	
+	def check_configuration(self, exp_config, config):
+		# assert two Configuration instances are equal
+		for var_name in ["_bram", "_tiles", "_comment", "_freq_range", "_warmboot", "_nosleep", "_extra_bits"]:
+			exp_value = getattr(exp_config, var_name)
+			value = getattr(config, var_name)
+			self.assertEqual(exp_value, value, f"Contents of {var_name} differ from expected values:")
+	
 	def test_get_bit(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
 		config = Configuration.create_from_asc(asc_path)
@@ -318,6 +325,14 @@ class ConfigurationTest(unittest.TestCase):
 				# compare asc
 				with open(asc_path, "r") as exp_file, open(out_filename, "r") as res_file:
 					self.assert_structural_equal(exp_file, res_file)
+				
+				# read ref asc
+				exp_config = Configuration.create_blank()
+				with open(asc_path, "r") as exp_file:
+					exp_config.read_asc(exp_file)
+				
+				# compare configurations
+				self.check_configuration(exp_config, dut)
 				
 				# clean up
 				os.remove(out_filename)
