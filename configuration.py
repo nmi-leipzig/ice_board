@@ -581,9 +581,35 @@ class Configuration:
 		bin_out.write_warmboot(self._warmboot, self._nosleep)
 		
 		# bank width
-		
+		bin_out.set_bank_width(self._spec.cram_width)
 		# bank height
+		bin_out.set_bank_height(self._spec.cram_height)
 		# bank offset
+		bin_out.set_bank_offset(0)
+		
+		# write CRAM
+		for bank_number in range(len(cram)):
+			bin_out.set_bank_number(bank_number)
+			bin_out.write_cram(cram)
+		
+		# write BRAM
+		chunk_size = 128
+		bin_out.set_bank_width(self._spec.bram_width)
+		bin_out.set_bank_height(chunk_size)
+		for bank_number in range(len(bram)):
+			bin_out.set_bank_number(bank_number)
+			for bank_offset in range(0, self._spec.bram_height, chunk_size):
+				bin_out.set_bank_offset(bank_offset)
+				bin_out.write_bram(bram)
+		
+		# CRC check
+		bin_out.crc_check()
+		
+		# wakeup
+		bin_out.wakeup()
+		
+		# padding
+		bin_out.write_bytes(b"\x00")
 	
 	def _read_cram_banks(self, cram: Iterable[Bank]) -> None:
 		self._access_cram_banks(cram, True)

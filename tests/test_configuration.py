@@ -253,7 +253,6 @@ class ConfigurationTest(unittest.TestCase):
 				config.set_bram_values(current.ram_block, current.initial_data, 0, current.mode)
 				values = config.get_bram_values(current.ram_block, 0, len(current.initial_data), current.mode)
 				self.assertEqual(current.initial_data, values)
-		pass
 	
 	def test_asc_compare(self):
 		# self test for the assert_structural_equal method
@@ -301,7 +300,7 @@ class ConfigurationTest(unittest.TestCase):
 			with self.subTest(base_name=base_name):
 				self.generic_read_bin_test(base_name)
 	
-	def test_read_bin_asc(self):
+	def test_read_bin_pairs(self):
 		test_files = [
 			("echo.bin", "echo.asc"),
 			("send_all_bram.256x16.25_27.bin", "send_all_bram.256x16.25_27.asc"),
@@ -336,6 +335,60 @@ class ConfigurationTest(unittest.TestCase):
 				
 				# clean up
 				os.remove(out_filename)
+	
+	def test_write_bin_asc(self):
+		for asc_file in self.iter_asc_files():
+			with self.subTest(asc_name=asc_file.name):
+				out_filename = f"tmp.test_write_bin_asc.{os.path.basename(asc_file.name)}.bin"
+				
+				exp = Configuration.create_blank()
+				dut = Configuration.create_blank()
+				res = Configuration.create_blank()
+				
+				exp.read_asc(asc_file)
+				asc_file.seek(0)
+				dut.read_asc(asc_file)
+				
+				with open(out_filename, "wb") as out_file:
+					dut.write_bin(out_file)
+				
+				with open(out_filename, "rb") as out_file:
+					res.read_bin(out_file)
+				
+				self.check_configuration(exp, res)
+		
+	
+	def test_write_bin_pairs(self):
+		for bin_file, asc_file in self.iter_bin_asc_pairs():
+			with self.subTest(asc_name=asc_file.name):
+				out_filename = f"tmp.test_write_bin_pairs.{os.path.basename(bin_file.name)}"
+				dut = Configuration.create_blank()
+				dut.read_asc(asc_file)
+				
+				with open(out_filename, "wb") as out_file:
+					dut.write_bin(out_file)
+				
+				exp = bin_file.read()
+				with open(out_filename, "rb") as out_file:
+					res = out_file.read()
+				
+				self.assertEqual(exp, res)
+				
+				os.remove(out_filename)
+		
+	
+	def iter_bin_asc_pairs(self):
+		pairs = [
+			("echo.bin", "echo.asc"),
+			("send_all_bram.256x16.25_27.bin", "send_all_bram.256x16.25_27.asc"),
+		]
+		
+		for bin_filename, asc_filename in pairs:
+			bin_path = self.get_data(bin_filename, must_exist=True)
+			asc_path = self.get_data(asc_filename, must_exist=True)
+			
+			with open(bin_path, "rb") as bin_file, open(asc_path, "r") as asc_file:
+				yield bin_file, asc_file 
 	
 	def iter_asc_files(self):
 		for asc_filename in [
