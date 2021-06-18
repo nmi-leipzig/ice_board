@@ -57,7 +57,7 @@ class BinOut:
 	
 	def write_bytes(self, data: bytes) -> None:
 		"""Write bytes, update CRC accordingly"""
-		count = self.bin_file.write(data)
+		count = self._bin_file.write(data)
 		
 		if count != len(data):
 			raise IOError(f"only {count} of {len(data)} bytes written")
@@ -68,6 +68,8 @@ class BinOut:
 		self.write_bytes(b"\xff\x00")
 		
 		if comment:
+			if comment[-1] == "\n":
+				comment = comment[:-1]
 			for line in comment.split("\n"):
 				self.write_bytes(line.encode("utf-8"))
 				self.write_bytes(b"\x00")
@@ -102,7 +104,7 @@ class BinOut:
 	
 	def set_bank_width(self, width: int) -> None:
 		self.write_bytes(b"\x62")
-		self.write_bytes(width.to_bytes(2, "big"))
+		self.write_bytes((width-1).to_bytes(2, "big"))
 		self._bank_width = width
 	
 	def set_bank_height(self, height: int) -> None:
@@ -119,11 +121,11 @@ class BinOut:
 		data = []
 		for y in range(self._bank_height):
 			bit_data = xram[self._bank_number][y+self._bank_offset][0:self._bank_width]
-			# msb first
 			for byte_bits in self.grouper(bit_data, 8, 0):
 				val = 0
-				for pos, bit_val in enumerate(byte_bits):
-					val |= bit_val << pos
+				for bit_val in byte_bits:
+					val <<= 1
+					val |= bit_val
 				data.append(val)
 		return bytes(data)
 	
@@ -141,10 +143,10 @@ class BinOut:
 	
 	def crc_check(self) -> None:
 		self.write_bytes(b"\x22")
-		self.write_bytes(crc.value.to_bytes(2, "big"))
+		self.write_bytes(self._crc.value.to_bytes(2, "big"))
 	
 	def wakeup(self) -> None:
-		self.write_bytes(b"\x0106")
+		self.write_bytes(b"\x01\x06")
 	
 	@staticmethod
 	def grouper(iterable: Iterable, n: int, fillvalue: Any) -> Iterable:
