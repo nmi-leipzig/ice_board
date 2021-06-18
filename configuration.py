@@ -45,7 +45,7 @@ NOSLEEP_MASK = 1
 WARMBOOT_MASK = 1<<5
 
 class BinOut:
-	"""Wrapper around BinaryIO to provide functions for creating bianry bitstreams"""
+	"""Wrapper around BinaryIO to provide functions for creating binary bitstreams"""
 	def __init__(self, bin_file: BinaryIO) -> None:
 		self._bin_file = bin_file
 		self._crc = CRC()
