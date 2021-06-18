@@ -46,6 +46,9 @@ WARMBOOT_MASK = 1<<5
 
 class BinOut:
 	"""Wrapper around BinaryIO to provide functions for creating binary bitstreams"""
+	
+	BOOLS_TO_BYTES = {tuple(v&1<<(7-i) != 0 for i in range(8)): v for v in range(256)}
+	
 	def __init__(self, bin_file: BinaryIO) -> None:
 		self._bin_file = bin_file
 		self._crc = CRC()
@@ -122,11 +125,12 @@ class BinOut:
 		for y in range(self._bank_height):
 			bit_data = xram[self._bank_number][y+self._bank_offset][0:self._bank_width]
 			for byte_bits in self.grouper(bit_data, 8, 0):
-				val = 0
-				for bit_val in byte_bits:
-					val <<= 1
-					val |= bit_val
-				data.append(val)
+				data.append(self.BOOLS_TO_BYTES[byte_bits])
+				#val = 0
+				#for bit_val in byte_bits:
+				#	val <<= 1
+				#	val |= bit_val
+				#data.append(val)
 		return bytes(data)
 	
 	def write_cram(self, cram: Sequence[Bank]) -> None:
