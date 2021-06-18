@@ -115,7 +115,7 @@ class BinOut:
 		self.write_bytes(offset.to_bytes(2, "big"))
 		self._bank_offset = offset
 	
-	def data_from_xram(xram: Sequence[Bank]) -> bytes:
+	def data_from_xram(self, xram: Sequence[Bank]) -> bytes:
 		data = []
 		for y in range(self._bank_height):
 			bit_data = xram[self._bank_number][y+self._bank_offset][0:self._bank_width]
