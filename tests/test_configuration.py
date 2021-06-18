@@ -270,6 +270,7 @@ class ConfigurationTest(unittest.TestCase):
 	
 	def generic_read_bin_test(self, base_name):
 		bin_path = self.get_data(f"{base_name}.bin", must_exist=True)
+		out_filename = f"tmp.generic_read_bin_test.{base_name}.asc"
 		
 		dut = Configuration.create_blank()
 		with open(bin_path, "rb") as bin_file:
@@ -283,7 +284,7 @@ class ConfigurationTest(unittest.TestCase):
 		tile_pos = TilePosition(*data[0])
 		tile_data = tuple(data[1])
 		
-		with open(f"tmp.{base_name}.asc", "w") as asc_out:
+		with open(out_filename, "w") as asc_out:
 			dut.write_asc(asc_out)
 		self.assertEqual(tile_data, dut._tiles[tile_pos])
 		
@@ -294,6 +295,8 @@ class ConfigurationTest(unittest.TestCase):
 		self.assertEqual(bram_data, dut._bram[bram_pos][:len(bram_data)])
 		rest = tuple([False]*len(bram_data[0]) for _ in range(len(dut._bram[bram_pos])-len(bram_data)))
 		self.assertEqual(rest, dut._bram[bram_pos][len(bram_data):])
+		
+		os.remove(out_filename)
 	
 	def test_read_bin_known_bits(self):
 		for base_name in ["send_all_bram.512x8", "send_all_bram.256x16.25_27"]:
@@ -356,6 +359,8 @@ class ConfigurationTest(unittest.TestCase):
 					res.read_bin(out_file)
 				
 				self.check_configuration(exp, res)
+				
+				os.remove(out_filename)
 		
 	
 	def test_write_bin_pairs(self):
