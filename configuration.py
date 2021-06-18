@@ -127,6 +127,25 @@ class BinOut:
 				data.append(val)
 		return bytes(data)
 	
+	def write_cram(self, cram: Sequence[Bank]) -> None:
+		data = self.data_from_xram(cram)
+		self.write_bytes(b"\x01\x01")
+		self.write_bytes(data)
+		self.write_bytes(b"\x00\x00")
+	
+	def write_bram(self, bram: Sequence[Bank]) -> None:
+		data = self.data_from_xram(bram)
+		self.write_bytes(b"\x01\x03")
+		self.write_bytes(data)
+		self.write_bytes(b"\x00\x00")
+	
+	def crc_check(self) -> None:
+		self.write_bytes(b"\x22")
+		self.write_bytes(crc.value.to_bytes(2, "big"))
+	
+	def wakeup(self) -> None:
+		self.write_bytes(b"\x0106")
+	
 	@staticmethod
 	def grouper(iterable: Iterable, n: int, fillvalue: Any) -> Iterable:
 		# according to https://docs.python.org/dev/library/itertools.html#itertools-recipes
@@ -558,7 +577,6 @@ class Configuration:
 		
 		# warmboot & nosleep
 		bin_out.write_warmboot(self._warmboot, self._nosleep)
-		
 		
 		# bank width
 		
