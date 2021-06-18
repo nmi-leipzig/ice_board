@@ -7,7 +7,7 @@ import timeit
 import enum
 
 from itertools import zip_longest
-from typing import BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
+from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
 
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
 
@@ -55,7 +55,7 @@ class BinOut:
 		self._bank_offset = None
 		
 	
-	def write_bytes(self, data bytes) -> None:
+	def write_bytes(self, data: bytes) -> None:
 		"""Write bytes, update CRC accordingly"""
 		count = self.bin_file.write(data)
 		
@@ -545,13 +545,13 @@ class Configuration:
 		self._read_cram_banks(cram)
 		self._read_bram_banks(bram)
 	
-	def _get_cram_banks(self) -> List[Banks]:
+	def _get_cram_banks(self) -> List[Bank]:
 		cram = self._all_blank_cram_banks()
 		self._write_cram_banks(cram)
 		
 		return cram
 	
-	def _get_bram_banks(self) -> List[Banks]:
+	def _get_bram_banks(self) -> List[Bank]:
 		bram = self._all_blank_bram_banks()
 		self._write_bram_banks(bram)
 		
