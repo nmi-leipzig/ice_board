@@ -5,6 +5,8 @@ import os
 from array import array
 import timeit
 import enum
+
+from itertools import zip_longest
 from typing import BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
 
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
@@ -39,6 +41,98 @@ class CRC:
 	def update(self, data: bytes) -> None:
 		self._value = binascii.crc_hqx(data, self._value)
 
+NOSLEEP_MASK = 1
+WARMBOOT_MASK = 1<<5
+
+class BinOut:
+	"""Wrapper around BinaryIO to provide functions for creating bianry bitstreams"""
+	def __init__(self, bin_file: BinaryIO) -> None:
+		self._bin_file = bin_file
+		self._crc = CRC()
+		self._bank_number = None
+		self._bank_width = None
+		self._bank_height = None
+		self._bank_offset = None
+		
+	
+	def write_bytes(self, data bytes) -> None:
+		"""Write bytes, update CRC accordingly"""
+		count = self.bin_file.write(data)
+		
+		if count != len(data):
+			raise IOError(f"only {count} of {len(data)} bytes written")
+		
+		self._crc.update(data)
+	
+	def write_comment(self, comment: str) -> None:
+		self.write_bytes(b"\xff\x00")
+		
+		if comment:
+			for line in comment.split("\n"):
+				self.write_bytes(line.encode("utf-8"))
+				self.write_bytes(b"\x00")
+		
+		self.write_bytes(b"\x00\xff")
+	
+	def write_preamble(self) -> None:
+		self.write_bytes(b"\x7e\xaa\x99\x7e")
+	
+	def write_freq_range(self, freq_range: FreqRange) -> None:
+		self.write_bytes(b"\x51")
+		self.write_bytes(bytes([int(freq_range)]))
+	
+	def crc_reset(self) -> None:
+		self.write_bytes(b"\x01\x05")
+		self._crc.reset()
+	
+	def write_warmboot(self, warmboot: bool, nosleep: bool) -> None:
+		"""Write warmboot and nosleep flags"""
+		self.write_bytes(b"\x92\x00")
+		wn = 0
+		if nosleep:
+			wn |= NOSLEEP_MASK
+		if warmboot:
+			wn |= WARMBOOT_MASK
+		self.write_bytes(bytes([wn]))
+	
+	def set_bank_number(self, number: int) -> None:
+		self.write_bytes(b"\x11")
+		self.write_bytes(bytes([number]))
+		self._bank_number = number
+	
+	def set_bank_width(self, width: int) -> None:
+		self.write_bytes(b"\x62")
+		self.write_bytes(width.to_bytes(2, "big"))
+		self._bank_width = width
+	
+	def set_bank_height(self, height: int) -> None:
+		self.write_bytes(b"\x72")
+		self.write_bytes(height.to_bytes(2, "big"))
+		self._bank_height = height
+	
+	def set_bank_offset(self, offset: int) -> None:
+		self.write_bytes(b"\x82")
+		self.write_bytes(offset.to_bytes(2, "big"))
+		self._bank_offset = offset
+	
+	def data_from_xram(xram: Sequence[Bank]) -> bytes:
+		data = []
+		for y in range(self._bank_height):
+			bit_data = xram[self._bank_number][y+self._bank_offset][0:self._bank_width]
+			# msb first
+			for byte_bits in self.grouper(bit_data, 8, 0):
+				val = 0
+				for pos, bit_val in enumerate(byte_bits):
+					val |= bit_val << pos
+				data.append(val)
+		return bytes(data)
+	
+	@staticmethod
+	def grouper(iterable: Iterable, n: int, fillvalue: Any) -> Iterable:
+		# according to https://docs.python.org/dev/library/itertools.html#itertools-recipes
+		args = [iter(iterable)] * n
+		return zip_longest(*args, fillvalue=fillvalue)
+
 TILE_TYPE_TO_ASC_ENTRY = {
 	TileType.LOGIC: "logic_tile",
 	TileType.IO: "io_tile",
@@ -47,9 +141,6 @@ TILE_TYPE_TO_ASC_ENTRY = {
 }
 
 ASC_ENTRY_TO_TILE_TYPE = {a:t for t, a in TILE_TYPE_TO_ASC_ENTRY.items()}
-
-NOSLEEP_MASK = 1
-WARMBOOT_MASK = 1<<5
 
 class Configuration:
 	"""represents the configuration of a FPGA"""
@@ -434,6 +525,45 @@ class Configuration:
 		
 		self._read_cram_banks(cram)
 		self._read_bram_banks(bram)
+	
+	def _get_cram_banks(self) -> List[Banks]:
+		cram = self._all_blank_cram_banks()
+		self._write_cram_banks(cram)
+		
+		return cram
+	
+	def _get_bram_banks(self) -> List[Banks]:
+		bram = self._all_blank_bram_banks()
+		self._write_bram_banks(bram)
+		
+		return bram
+	
+	def write_bin(self, bin_file: BinaryIO):
+		cram = self._get_cram_banks()
+		bram = self._get_bram_banks()
+		
+		bin_out = BinOut(bin_file)
+		
+		# comment
+		bin_out.write_comment(self._comment)
+		
+		# preamble
+		bin_out.write_preamble()
+		
+		# frequency range
+		bin_out.write_freq_range(self._freq_range)
+		
+		# CRC reset
+		bin_out.crc_reset()
+		
+		# warmboot & nosleep
+		bin_out.write_warmboot(self._warmboot, self._nosleep)
+		
+		
+		# bank width
+		
+		# bank height
+		# bank offset
 	
 	def _read_cram_banks(self, cram: Iterable[Bank]) -> None:
 		self._access_cram_banks(cram, True)
