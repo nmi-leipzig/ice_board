@@ -97,7 +97,7 @@ class FPGABoard:
 		self._close()
 		return False
 	
-	def flash_bitstream(self, bitstream_path):
+	def flash_bitstream_file(self, bitstream_path):
 		#self._flash_bitstream_iceprog(bitstream_path)
 		self._flash_bitstream_spi(bitstream_path)
 	

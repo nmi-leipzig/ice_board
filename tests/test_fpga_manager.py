@@ -183,7 +183,7 @@ class FPGAManagerTest(unittest.TestCase):
 def max_true(individual):
 	with get_fpga_board() as fpga_board:
 		#print("Board in eval: {} {}".format(fpga_board.serial_number, hex(id(fpga_board))))
-		fpga_board.flash_bitstream(os.path.join(f"{__file__}.data", "sum_fpga.bin"))
+		fpga_board.flash_bitstream_file(os.path.join(f"{__file__}.data", "sum_fpga.bin"))
 		#print("send individual")
 		fpga_board.uart.write(bytes(individual))
 		#print("read sum")

@@ -46,14 +46,14 @@ class FPGABoardTest(unittest.TestCase):
 			mock_init.assert_called_once_with(res, self.valid_sn, baudrate, timeout)
 	
 	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
-	def test_flash_bitstream(self):
+	def test_flash_bitstream_file(self):
 		"""
 		:avocado: tags=hil
 		"""
 		data_length = 10
 		bitstream_path = self.get_data("echo_fpga.bin")
 		with FPGABoard.get_suitable_board() as fpga:
-			fpga.flash_bitstream(bitstream_path)
+			fpga.flash_bitstream_file(bitstream_path)
 			data = bytes(random.choices(range(256), k=data_length))
 			fpga.uart.write(data)
 			read_data = fpga.uart.read(data_length)
