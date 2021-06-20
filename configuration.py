@@ -121,16 +121,12 @@ class BinOut:
 		self._bank_offset = offset
 	
 	def data_from_xram(self, xram: Sequence[Bank]) -> bytes:
-		data = []
-		for y in range(self._bank_height):
-			bit_data = xram[self._bank_number][y+self._bank_offset][0:self._bank_width]
-			for byte_bits in self.grouper(bit_data, 8, 0):
-				data.append(self.BOOLS_TO_BYTES[byte_bits])
-				#val = 0
-				#for bit_val in byte_bits:
-				#	val <<= 1
-				#	val |= bit_val
-				#data.append(val)
+		# use list comprehension to avoid call of append (append version takes nearly 3 times as long)
+		data = [
+			self.BOOLS_TO_BYTES[byte_bits]
+			for y in range(self._bank_height)
+				for byte_bits in self.grouper(xram[self._bank_number][y+self._bank_offset][0:self._bank_width], 8, 0)
+		]
 		return bytes(data)
 	
 	def write_cram(self, cram: Sequence[Bank]) -> None:
