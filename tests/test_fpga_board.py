@@ -83,8 +83,10 @@ class FPGABoardTest(unittest.TestCase):
 		:avocado: tags=hil
 		"""
 		data_length = 10
-		asc_path = self.get_data("echo_fpga.asc")
-		config = Configuration.create_from_asc(asc_path)
+		bitstream_path = self.get_data("echo_fpga.bin")
+		config = Configuration.create_blank()
+		with open(bitstream_path, "rb") as bin_file:
+			config.read_bin(bin_file)
 		
 		with FPGABoard.get_suitable_board() as fpga:
 			fpga.configure(config)
