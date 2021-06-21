@@ -58,3 +58,20 @@ class FPGABoardTest(unittest.TestCase):
 			fpga.uart.write(data)
 			read_data = fpga.uart.read(data_length)
 			self.assertEqual(data, read_data, "Received data differs from send data; Echo botstream not working")
+	
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	def test_flash_bitstream(self):
+		"""
+		:avocado: tags=hil
+		"""
+		data_length = 10
+		bitstream_path = self.get_data("echo_fpga.bin")
+		with open(bitstream_path, "rb") as bin_file:
+			bitstream = bin_file.read()
+		
+		with FPGABoard.get_suitable_board() as fpga:
+			fpga.flash_bitstream(bitstream)
+			data = bytes(random.choices(range(256), k=data_length))
+			fpga.uart.write(data)
+			read_data = fpga.uart.read(data_length)
+			self.assertEqual(data, read_data, "Received data differs from send data; Echo botstream not working")

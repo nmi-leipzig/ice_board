@@ -6,6 +6,7 @@ import signal
 import sys
 import subprocess
 import logging
+import os
 import time
 
 sys.path.append("/usr/local/bin")
@@ -97,11 +98,24 @@ class FPGABoard:
 		self._close()
 		return False
 	
-	def flash_bitstream_file(self, bitstream_path):
-		#self._flash_bitstream_iceprog(bitstream_path)
-		self._flash_bitstream_spi(bitstream_path)
+	def flash_bitstream(self, bitstream: bytes) -> None:
+		self._flash_bitstream_spi(bitstream)
 	
-	def _flash_bitstream_iceprog(self, bitstream_path):
+	def flash_bitstream_file(self, bitstream_path: str) -> None:
+		#self._flash_bitstream_iceprog(bitstream_path)
+		self._flash_bitstream_file_spi(bitstream_path)
+	
+	def _flash_bitstream_iceprog(self,  bitstream: bytes) -> None:
+		bitstream_path = "tmp._flash_bitstream_iceprog.bin"
+		
+		with open(bitstream_path, "wb") as bin_file:
+			bin_file.write(bitstream)
+		
+		self._flash_bitstream_file_iceprog(bitstream_path)
+		
+		os.remove(bitstream_path)
+	
+	def _flash_bitstream_file_iceprog(self, bitstream_path: str) -> None:
 		vid = self._uart.udev.usb_dev.idVendor
 		pid = self._uart.udev.usb_dev.idProduct
 		sn = self._serial_number
@@ -111,11 +125,14 @@ class FPGABoard:
 			print(cpe.output)
 			raise
 	
-	def _flash_bitstream_spi(self, bitstream_path):
+	def _flash_bitstream_file_spi(self, bitstream_path: str) -> None:
 		# read bitstream
 		with open(bitstream_path, "rb") as bitstream_file:
 			bitstream = bitstream_file.read()
 		
+		self._flash_bitstream_spi(bitstream)
+	
+	def _flash_bitstream_spi(self, bitstream: bytes) -> None:
 		self._log.debug("CDONE: {}".format("high" if self._get_cdone() else "low"))
 		
 		# creset to low
