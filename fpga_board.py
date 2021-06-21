@@ -12,6 +12,7 @@ import time
 sys.path.append("/usr/local/bin")
 import icebox
 
+from .configuration import Configuration
 from .serial_utils import is_valid_serial_number
 
 class ConfigurationError(Exception):
@@ -97,6 +98,10 @@ class FPGABoard:
 	def __exit__(self, exc_type, exc_value, traceback):
 		self._close()
 		return False
+	
+	def configure(self, config: Configuration) -> None:
+		bitstream = config.get_bitstream()
+		self.flash_bitstream(bitstream)
 	
 	def flash_bitstream(self, bitstream: bytes) -> None:
 		self._flash_bitstream_spi(bitstream)

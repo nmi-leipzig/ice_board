@@ -9,6 +9,7 @@ import unittest
 
 from pyftdi.usbtools import UsbDeviceDescriptor
 
+from ..configuration import Configuration
 from ..fpga_board import FPGABoard
 
 class FPGABoardTest(unittest.TestCase):
@@ -71,6 +72,22 @@ class FPGABoardTest(unittest.TestCase):
 		
 		with FPGABoard.get_suitable_board() as fpga:
 			fpga.flash_bitstream(bitstream)
+			data = bytes(random.choices(range(256), k=data_length))
+			fpga.uart.write(data)
+			read_data = fpga.uart.read(data_length)
+			self.assertEqual(data, read_data, "Received data differs from send data; Echo botstream not working")
+	
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	def test_configure(self):
+		"""
+		:avocado: tags=hil
+		"""
+		data_length = 10
+		asc_path = self.get_data("echo_fpga.asc")
+		config = Configuration.create_from_asc(asc_path)
+		
+		with FPGABoard.get_suitable_board() as fpga:
+			fpga.configure(config)
 			data = bytes(random.choices(range(256), k=data_length))
 			fpga.uart.write(data)
 			read_data = fpga.uart.read(data_length)
