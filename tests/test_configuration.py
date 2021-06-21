@@ -339,6 +339,18 @@ class ConfigurationTest(unittest.TestCase):
 				# clean up
 				os.remove(out_filename)
 	
+	def test_get_bitstream(self):
+		for bin_file, asc_file in self.iter_bin_asc_pairs():
+			with self.subTest(asc_name=asc_file.name):
+				dut = Configuration.create_blank()
+				dut.read_asc(asc_file)
+				
+				res = dut.get_bitstream()
+				
+				exp = bin_file.read()
+				
+				self.assertEqual(exp, res)
+	
 	def test_write_bin_asc(self):
 		for asc_file in self.iter_asc_files():
 			with self.subTest(asc_name=asc_file.name):
@@ -361,7 +373,6 @@ class ConfigurationTest(unittest.TestCase):
 				self.check_configuration(exp, res)
 				
 				os.remove(out_filename)
-		
 	
 	def test_write_bin_pairs(self):
 		for bin_file, asc_file in self.iter_bin_asc_pairs():
@@ -380,7 +391,6 @@ class ConfigurationTest(unittest.TestCase):
 				self.assertEqual(exp, res)
 				
 				os.remove(out_filename)
-		
 	
 	def iter_bin_asc_pairs(self):
 		pairs = [

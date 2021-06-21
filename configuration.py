@@ -6,6 +6,7 @@ from array import array
 import timeit
 import enum
 
+from io import BytesIO
 from itertools import zip_longest
 from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
 
@@ -558,6 +559,13 @@ class Configuration:
 		self._write_bram_banks(bram)
 		
 		return bram
+	
+	def get_bitstream(self) -> bytes:
+		with BytesIO() as bin_file:
+			self.write_bin(bin_file)
+			bitstream = bin_file.getvalue()
+		
+		return bitstream
 	
 	def write_bin(self, bin_file: BinaryIO):
 		cram = self._get_cram_banks()
