@@ -714,13 +714,6 @@ class Configuration:
 		self._access_bram_banks(bram, False)
 	
 	def _access_bram_banks(self, bram: Iterable[Bank], read: bool) -> None:
-		if read:
-			# write BRAM bank data to ram tile data
-			assign = self.first_from_second
-		else:
-			# write ram tile data to BRAM bank
-			assign = self.second_from_first
-		
 		for bank_nr, bram_bank in enumerate(bram):
 			top = bank_nr%2 == 1
 			tile_x = self._spec.bram_cols[bank_nr//2]
@@ -735,10 +728,10 @@ class Configuration:
 					# bank_y equals word address in ram tile data
 					col_index = bank_y % 16
 					row_index = bank_y // 16
-					assign(
-						bram_data[row_index], slice(col_index*16, (col_index+1)*16),
-						bram_row, self.reverse_slice(slice(block_nr*16, (block_nr+1)*16))
-					)
+					if read:
+						bram_data[row_index][(col_index+1)*16-1:col_index*16-1 if col_index else None:-1] = bram_row[block_nr*16:(block_nr+1)*16]
+					else:
+						bram_row[(block_nr+1)*16-1:block_nr*16-1 if block_nr else None:-1] = bram_data[row_index][col_index*16:(col_index+1)*16]
 	
 	@staticmethod
 	def reverse_slice(org_slice: slice) -> slice:
