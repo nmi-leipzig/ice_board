@@ -765,16 +765,6 @@ class Configuration:
 		
 		return slice(start, stop, step)
 	
-	@staticmethod
-	def first_from_second(first: Sequence, first_slice: slice, second: Sequence, second_slice: slice):
-		"""Assign the values from the slice of the second sequence to the slice of the first sequence"""
-		first[first_slice] = second[second_slice]
-	
-	@staticmethod
-	def second_from_first(first: Sequence, first_slice:slice, second: Sequence, second_slice: slice):
-		"""Assign the values from the slice of the first sequence to the slice of the second sequence"""
-		second[second_slice] = first[first_slice]
-	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
 		val = cls.get_bytes_crc(bin_file, len(exp), crc)
