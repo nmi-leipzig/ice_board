@@ -626,13 +626,6 @@ class Configuration:
 		self._access_cram_banks(cram, False)
 	
 	def _access_cram_banks(self, cram: Iterable[Bank], read: bool) -> None:
-		if read:
-			# write CRAM bank data to tiles
-			assign = self.first_from_second
-		else:
-			# write tiles to CRAM bank
-			assign = self.second_from_first
-		
 		for bank_nr, cram_bank in enumerate(cram):
 			top = bank_nr%2 == 1
 			right = bank_nr >= 2
@@ -689,10 +682,10 @@ class Configuration:
 						cram_y_range = reversed(cram_y_range)
 					
 					for group, cram_y in enumerate(cram_y_range):
-						assign(
-							tile_data[group], slice(0, tile_width),
-							cram_bank[cram_y], group_slice
-						)
+						if read:
+							tile_data[group][0:tile_width] = cram_bank[cram_y][group_slice]
+						else:
+							cram_bank[cram_y][group_slice] = tile_data[group][0:tile_width]
 					
 					x_off += tile_width
 				y_off += self._spec.tile_height
