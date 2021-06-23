@@ -14,7 +14,7 @@ import numpy as np
 
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
 
-Bank = NewType("Bank", Tuple[List[bool], ...])
+Bank = NewType("Bank", np.ndarray)
 
 class FreqRange(enum.IntEnum):
 	"""Values for internal oscillator frequncy range
@@ -124,13 +124,7 @@ class BinOut:
 		self._bank_offset = offset
 	
 	def data_from_xram(self, xram: Sequence[Bank]) -> bytes:
-		# use list comprehension to avoid call of append (append version takes nearly 3 times as long)
-		data = [
-			self.BOOLS_TO_BYTES[byte_bits]
-			for y in range(self._bank_height)
-				for byte_bits in self.grouper(xram[self._bank_number][y+self._bank_offset][0:self._bank_width], 8, 0)
-		]
-		return bytes(data)
+		return np.packbits(xram[self._bank_number][self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
 	
 	def write_cram(self, cram: Sequence[Bank]) -> None:
 		data = self.data_from_xram(cram)
@@ -401,7 +395,7 @@ class Configuration:
 		
 		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
 		"""
-		return tuple([False]*self._spec.cram_width for _ in range(self._spec.cram_height))
+		return np.full((self._spec.cram_height, self._spec.cram_width), False, dtype=bool)
 	
 	def _all_blank_cram_banks(self) -> Tuple[Bank, ...]:
 		"""Create all CRAM banks as used in binary bitstreams with all bits set to 0.
@@ -416,7 +410,7 @@ class Configuration:
 		
 		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
 		"""
-		return tuple([False]*self._spec.bram_width for _ in range(self._spec.bram_height))
+		return np.full((self._spec.bram_height, self._spec.bram_width), False, dtype=bool)
 	
 	def _all_blank_bram_banks(self) -> Tuple[Bank, ...]:
 		"""Create all BRAM banks as used in binary bitstreams with all bits set to 0.
