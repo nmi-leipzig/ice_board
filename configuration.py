@@ -676,6 +676,7 @@ class Configuration:
 					group_slice = slice(x_off, x_off+tile_width)
 					if right or tile_type == TileType.IO:
 						group_slice = self.reverse_slice(group_slice)
+					tile_slice = slice(0, tile_width)
 					
 					cram_y_range = range(y_off, y_off+self._spec.tile_height)
 					if top:
@@ -683,9 +684,9 @@ class Configuration:
 					
 					for group, cram_y in enumerate(cram_y_range):
 						if read:
-							tile_data[group][0:tile_width] = cram_bank[cram_y][group_slice]
+							tile_data[group][tile_slice] = cram_bank[cram_y][group_slice]
 						else:
-							cram_bank[cram_y][group_slice] = tile_data[group][0:tile_width]
+							cram_bank[cram_y][group_slice] = tile_data[group][tile_slice]
 					
 					x_off += tile_width
 				y_off += self._spec.tile_height
