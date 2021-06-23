@@ -669,20 +669,19 @@ class Configuration:
 					tile_type = self._tile_types[tile_pos]
 					tile_width = self._spec.tile_type_width[tile_type]
 					
-					group_slice = slice(x_off, x_off+tile_width)
+					cram_x_slice = slice(x_off, x_off+tile_width)
 					if right or tile_type == TileType.IO:
-						group_slice = self.reverse_slice(group_slice)
-					tile_slice = slice(0, tile_width)
+						cram_x_slice = self.reverse_slice(cram_x_slice)
+					index_slice = slice(0, tile_width)
 					
-					cram_y_range = range(y_off, y_off+self._spec.tile_height)
+					cram_y_slice = slice(y_off, y_off+self._spec.tile_height)
 					if top:
-						cram_y_range = reversed(cram_y_range)
+						cram_y_slice = self.reverse_slice(cram_y_slice)
 					
-					for group, cram_y in enumerate(cram_y_range):
-						if read:
-							tile_data[group][tile_slice] = cram_bank[cram_y][group_slice]
-						else:
-							cram_bank[cram_y][group_slice] = tile_data[group][tile_slice]
+					if read:
+						tile_data[:self._spec.tile_height, index_slice] = cram_bank[cram_y_slice, cram_x_slice]
+					else:
+						cram_bank[cram_y_slice, cram_x_slice] = tile_data[:self._spec.tile_height, index_slice]
 					
 					x_off += tile_width
 				y_off += self._spec.tile_height
@@ -691,11 +690,11 @@ class Configuration:
 		if read:
 			self._extra_bits = []
 			for extra in self._spec.extra_bits:
-				if cram[extra.bank][extra.y][extra.x]:
+				if cram[extra.bank][extra.y, extra.x]:
 					self._extra_bits.append(extra)
 		else:
 			for extra in self._extra_bits:
-				cram[extra.bank][extra.y][extra.x] = True
+				cram[extra.bank][extra.y, extra.x] = True
 	
 	def _read_bram_banks(self, bram: Iterable[Bank]) -> None:
 		self._access_bram_banks(bram, True)
