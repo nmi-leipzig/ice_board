@@ -718,14 +718,18 @@ class Configuration:
 					tile_y += self._spec.max_y//2
 				bram_data = self._bram[TilePosition(tile_x, tile_y)]
 				
+				row_slice = slice(block_nr*16, (block_nr+1)*16)
+				if not read:
+					row_slice = self.reverse_slice(row_slice)
+				
 				for bank_y, bram_row in enumerate(bram_bank):
 					# bank_y equals word address in ram tile data
 					col_index = bank_y % 16
 					row_index = bank_y // 16
 					if read:
-						bram_data[row_index][(col_index+1)*16-1:col_index*16-1 if col_index else None:-1] = bram_row[block_nr*16:(block_nr+1)*16]
+						bram_data[row_index][(col_index+1)*16-1:col_index*16-1 if col_index else None:-1] = bram_row[row_slice]
 					else:
-						bram_row[(block_nr+1)*16-1:block_nr*16-1 if block_nr else None:-1] = bram_data[row_index][col_index*16:(col_index+1)*16]
+						bram_row[row_slice] = bram_data[row_index][col_index*16:(col_index+1)*16]
 	
 	@staticmethod
 	def reverse_slice(org_slice: slice) -> slice:
