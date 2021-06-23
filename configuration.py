@@ -10,6 +10,8 @@ from io import BytesIO
 from itertools import zip_longest
 from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
 
+import numpy as np
+
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
 
 Bank = NewType("Bank", Tuple[List[bool], ...])
@@ -185,13 +187,13 @@ class Configuration:
 		for pos, ttype in self._spec.get_tile_types():
 			width = self._spec.tile_type_width[ttype]
 			height = self._spec.tile_height
-			data = tuple([False]*width for _ in range(height))
+			data = np.full((height, width), False, dtype=bool)
 			self._tiles[pos] = data
 			self._tiles_by_type.setdefault(ttype, []).append(pos)
 			self._tile_types[pos] = ttype
 			
 			if ttype == TileType.RAM_B:
-				self._bram[pos] = tuple([False]*256 for _ in range(16))
+				self._bram[pos] = np.full((16, 256), False, dtype=bool)
 		
 	
 	def get_bit(self, x: int, y: int, group: int, index: int) -> bool:

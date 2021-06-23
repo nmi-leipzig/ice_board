@@ -7,6 +7,7 @@ import time
 import json
 
 import unittest
+import numpy as np
 
 from ..configuration import Configuration
 from ..device_data import TilePosition, BRAMMode, Bit
@@ -69,17 +70,17 @@ class ConfigurationTest(unittest.TestCase):
 			data = json.load(data_file)
 		tile_pos = TilePosition(*data[0])
 		
-		tile_data = tuple(data[1])
+		tile_data = np.array(data[1])
 		
-		self.assertEqual(tile_data, config._tiles[tile_pos])
+		np.testing.assert_equal(tile_data, config._tiles[tile_pos])
 		
 		# check bram
 		bram_pos = TilePosition(*data[2])
-		bram_data = tuple(data[3])
+		bram_data = np.array(data[3])
 		
-		self.assertEqual(bram_data, config._bram[bram_pos][:len(bram_data)])
-		rest = tuple([False]*len(bram_data[0]) for _ in range(len(config._bram[bram_pos])-len(bram_data)))
-		self.assertEqual(rest, config._bram[bram_pos][len(bram_data):])
+		np.testing.assert_equal(bram_data, config._bram[bram_pos][:len(bram_data)])
+		rest = np.full((len(config._bram[bram_pos])-len(bram_data), len(bram_data[0])), False)
+		np.testing.assert_equal(rest, config._bram[bram_pos][len(bram_data):])
 	
 	def test_write_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
@@ -144,7 +145,7 @@ class ConfigurationTest(unittest.TestCase):
 		for var_name in ["_bram", "_tiles", "_comment", "_freq_range", "_warmboot", "_nosleep", "_extra_bits"]:
 			exp_value = getattr(exp_config, var_name)
 			value = getattr(config, var_name)
-			self.assertEqual(exp_value, value, f"Contents of {var_name} differ from expected values:")
+			np.testing.assert_equal(exp_value, value, f"Contents of {var_name} differ from expected values:")
 	
 	def test_get_bit(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
@@ -282,19 +283,20 @@ class ConfigurationTest(unittest.TestCase):
 		
 		# check logic cell
 		tile_pos = TilePosition(*data[0])
-		tile_data = tuple(data[1])
+		tile_data = np.array(data[1])
 		
 		with open(out_filename, "w") as asc_out:
 			dut.write_asc(asc_out)
-		self.assertEqual(tile_data, dut._tiles[tile_pos])
+		
+		np.testing.assert_equal(dut._tiles[tile_pos], tile_data)
 		
 		# check bram
 		bram_pos = TilePosition(*data[2])
-		bram_data = tuple(data[3])
+		bram_data = np.array(data[3])
 		
-		self.assertEqual(bram_data, dut._bram[bram_pos][:len(bram_data)])
-		rest = tuple([False]*len(bram_data[0]) for _ in range(len(dut._bram[bram_pos])-len(bram_data)))
-		self.assertEqual(rest, dut._bram[bram_pos][len(bram_data):])
+		np.testing.assert_equal(dut._bram[bram_pos][:len(bram_data)], bram_data)
+		rest = np.full((len(dut._bram[bram_pos])-len(bram_data), len(bram_data[0])), False)
+		np.testing.assert_equal(dut._bram[bram_pos][len(bram_data):], rest)
 		
 		os.remove(out_filename)
 	
@@ -429,7 +431,7 @@ class ConfigurationTest(unittest.TestCase):
 				
 				self.assertEqual(dut1._bram.keys(), dut2._bram.keys())
 				for tile, data in dut1._bram.items():
-					self.assertEqual(data, dut2._bram[tile], f"Difference in RAM data at {tile}")
+					np.testing.assert_equal(data, dut2._bram[tile], f"Difference in RAM data at {tile}")
 	
 	def test_access_cram_matching(self):
 		# test that reading and writing CRAM banks go together
@@ -446,7 +448,7 @@ class ConfigurationTest(unittest.TestCase):
 				
 				self.assertEqual(dut1._tiles.keys(), dut2._tiles.keys())
 				for tile, data in dut1._tiles.items():
-					self.assertEqual(data, dut2._tiles[tile], f"Difference in tile data at {tile}")
+					np.testing.assert_equal(data, dut2._tiles[tile], f"Difference in tile data at {tile}")
 				
 				self.assertEqual(dut1._extra_bits, dut2._extra_bits)
 	
