@@ -634,10 +634,10 @@ class Configuration:
 				
 				for group, cram_y in enumerate([15, 14, 12, 13, 11, 10, 8, 9, 7, 6, 4, 5, 3, 2, 0, 1]):
 					if read:
-						tile_data[group][0:io_width] = [cram_bank[cram_y][x_off+i] for i in cram_indices]
+						tile_data[group, 0:io_width] = [cram_bank[cram_y, x_off+i] for i in cram_indices]
 					else:
 						for index, cram_x in enumerate(cram_indices):
-							cram_bank[cram_y][x_off+cram_x] = tile_data[group][index]
+							cram_bank[cram_y, x_off+cram_x] = tile_data[group, index]
 				
 				x_off += row_width
 			
@@ -671,11 +671,11 @@ class Configuration:
 		if read:
 			self._extra_bits = []
 			for extra in self._spec.extra_bits:
-				if cram[extra.bank][extra.y, extra.x]:
+				if cram[extra.bank, extra.y, extra.x]:
 					self._extra_bits.append(extra)
 		else:
 			for extra in self._extra_bits:
-				cram[extra.bank][extra.y, extra.x] = True
+				cram[extra.bank, extra.y, extra.x] = True
 	
 	def _read_bram_banks(self, bram: Banks) -> None:
 		self._access_bram_banks(bram, True)
@@ -703,9 +703,9 @@ class Configuration:
 					col_index = bank_y % 16
 					row_index = bank_y // 16
 					if read:
-						bram_data[row_index][(col_index+1)*16-1:col_index*16-1 if col_index else None:-1] = bram_row[row_slice]
+						bram_data[row_index, (col_index+1)*16-1:col_index*16-1 if col_index else None:-1] = bram_row[row_slice]
 					else:
-						bram_row[row_slice] = bram_data[row_index][col_index*16:(col_index+1)*16]
+						bram_row[row_slice] = bram_data[row_index, col_index*16:(col_index+1)*16]
 	
 	@staticmethod
 	def reverse_slice(org_slice: slice) -> slice:
