@@ -630,16 +630,15 @@ class Configuration:
 				
 				tile_data = self._tiles[TilePosition(tile_x, io_y)]
 				
-				cram_indices = [23, 25, 26, 27, 16, 17, 18, 19, 20, 14, 32, 33, 34, 35, 36, 37, 4, 5]
+				cram_x_idx = [23, 25, 26, 27, 16, 17, 18, 19, 20, 14, 32, 33, 34, 35, 36, 37, 4, 5]
 				if right:
-					cram_indices = [row_width-1-i for i in cram_indices]
+					cram_x_idx = [row_width-1-i for i in cram_x_idx]
 				
-				for group, cram_y in enumerate([15, 14, 12, 13, 11, 10, 8, 9, 7, 6, 4, 5, 3, 2, 0, 1]):
-					if read:
-						tile_data[group, 0:io_width] = [cram_bank[cram_y, x_off+i] for i in cram_indices]
-					else:
-						for index, cram_x in enumerate(cram_indices):
-							cram_bank[cram_y, x_off+cram_x] = tile_data[group, index]
+				cram_y_idx = np.array([15, 14, 12, 13, 11, 10, 8, 9, 7, 6, 4, 5, 3, 2, 0, 1])
+				if read:
+					tile_data[:, :] = cram_bank[cram_y_idx[:,np.newaxis],[x_off+i for i in cram_x_idx]]
+				else:
+					cram_bank[cram_y_idx[:,np.newaxis],[x_off+i for i in cram_x_idx]] = tile_data
 				
 				x_off += row_width
 			
