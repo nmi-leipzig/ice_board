@@ -220,7 +220,8 @@ class Configuration:
 		return row_index, col_index, offset
 	
 	@classmethod
-	def get_from_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, mode: BRAMMode=BRAMMode.BRAM_512x8) -> int:
+	def get_from_bram_data(cls, bram_data: np.ndarray, address: int, mode: BRAMMode=BRAMMode.BRAM_512x8) -> int:
+		# bram_data ndarray(shape=(16, 256), dtype=bool)
 		value_len = cls.value_length_from_mode(mode)
 		row_index, col_index, offset = cls.split_bram_address(address)
 		
@@ -235,7 +236,8 @@ class Configuration:
 		return value
 	
 	@classmethod
-	def set_in_bram_data(cls, bram_data: Iterable[Iterable[bool]], address: int, value: int, mode: BRAMMode=BRAMMode.BRAM_512x8) -> None:
+	def set_in_bram_data(cls, bram_data: np.ndarray, address: int, value: int, mode: BRAMMode=BRAMMode.BRAM_512x8) -> None:
+		# bram_data ndarray(shape=(16, 256), dtype=bool)
 		value_len = cls.value_length_from_mode(mode)
 		row_index, col_index, offset = cls.split_bram_address(address)
 		
