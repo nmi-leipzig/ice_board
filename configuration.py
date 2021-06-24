@@ -145,11 +145,6 @@ class BinOut:
 	def wakeup(self) -> None:
 		self.write_bytes(b"\x01\x06")
 	
-	@staticmethod
-	def grouper(iterable: Iterable, n: int, fillvalue: Any) -> Iterable:
-		# according to https://docs.python.org/dev/library/itertools.html#itertools-recipes
-		args = [iter(iterable)] * n
-		return zip_longest(*args, fillvalue=fillvalue)
 
 TILE_TYPE_TO_ASC_ENTRY = {
 	TileType.LOGIC: "logic_tile",
