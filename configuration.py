@@ -14,7 +14,7 @@ import numpy as np
 
 from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, TileType, SPECS_BY_ASC
 
-Bank = NewType("Bank", np.ndarray)
+Banks = NewType("Banks", np.ndarray)
 
 class FreqRange(enum.IntEnum):
 	"""Values for internal oscillator frequncy range
@@ -123,16 +123,16 @@ class BinOut:
 		self.write_bytes(offset.to_bytes(2, "big"))
 		self._bank_offset = offset
 	
-	def data_from_xram(self, xram: Sequence[Bank]) -> bytes:
-		return np.packbits(xram[self._bank_number][self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
+	def data_from_xram(self, xram: Banks) -> bytes:
+		return np.packbits(xram[self._bank_number, self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
 	
-	def write_cram(self, cram: Sequence[Bank]) -> None:
+	def write_cram(self, cram: Banks) -> None:
 		data = self.data_from_xram(cram)
 		self.write_bytes(b"\x01\x01")
 		self.write_bytes(data)
 		self.write_bytes(b"\x00\x00")
 	
-	def write_bram(self, bram: Sequence[Bank]) -> None:
+	def write_bram(self, bram: Banks) -> None:
 		data = self.data_from_xram(bram)
 		self.write_bytes(b"\x01\x03")
 		self.write_bytes(data)
@@ -390,35 +390,21 @@ class Configuration:
 		for extra_bit in self._extra_bits:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
-	def _blank_cram_bank(self) -> Bank:
-		"""Create a single CRAM bank as used in binary bitstreams with all bits set to 0.
-		
-		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
-		"""
-		return np.full((self._spec.cram_height, self._spec.cram_width), False, dtype=bool)
-	
-	def _all_blank_cram_banks(self) -> Tuple[Bank, ...]:
+	def _all_blank_cram_banks(self) -> Banks:
 		"""Create all CRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
 		x dimension.
 		"""
-		return tuple(self._blank_cram_bank() for _ in range(4))
+		return np.full((4, self._spec.cram_height, self._spec.cram_width), False, dtype=bool)
 	
-	def _blank_bram_bank(self) -> Bank:
-		"""Create a single BRAM bank as used in binary bitstreams with all bits set to 0.
-		
-		Attention: the access to the bank at x, y is reached by bank[y][x] to easier group the bits in the x dimension.
-		"""
-		return np.full((self._spec.bram_height, self._spec.bram_width), False, dtype=bool)
-	
-	def _all_blank_bram_banks(self) -> Tuple[Bank, ...]:
+	def _all_blank_bram_banks(self) -> Banks:
 		"""Create all BRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
 		x dimension.
 		"""
-		return tuple(self._blank_bram_bank() for _ in range(4))
+		return np.full((4, self._spec.bram_height, self._spec.bram_width), False, dtype=bool)
 	
 	def read_bin(self, bin_file: BinaryIO):
 		crc = CRC()
@@ -544,13 +530,13 @@ class Configuration:
 		self._read_cram_banks(cram)
 		self._read_bram_banks(bram)
 	
-	def _get_cram_banks(self) -> List[Bank]:
+	def _get_cram_banks(self) -> Banks:
 		cram = self._all_blank_cram_banks()
 		self._write_cram_banks(cram)
 		
 		return cram
 	
-	def _get_bram_banks(self) -> List[Bank]:
+	def _get_bram_banks(self) -> Banks:
 		bram = self._all_blank_bram_banks()
 		self._write_bram_banks(bram)
 		
@@ -615,13 +601,13 @@ class Configuration:
 		# padding
 		bin_out.write_bytes(b"\x00")
 	
-	def _read_cram_banks(self, cram: Iterable[Bank]) -> None:
+	def _read_cram_banks(self, cram: Banks) -> None:
 		self._access_cram_banks(cram, True)
 	
-	def _write_cram_banks(self, cram: Iterable[Bank]) -> None:
+	def _write_cram_banks(self, cram: Banks) -> None:
 		self._access_cram_banks(cram, False)
 	
-	def _access_cram_banks(self, cram: Iterable[Bank], read: bool) -> None:
+	def _access_cram_banks(self, cram: Banks, read: bool) -> None:
 		for bank_nr, cram_bank in enumerate(cram):
 			top = bank_nr%2 == 1
 			right = bank_nr >= 2
@@ -696,13 +682,13 @@ class Configuration:
 			for extra in self._extra_bits:
 				cram[extra.bank][extra.y, extra.x] = True
 	
-	def _read_bram_banks(self, bram: Iterable[Bank]) -> None:
+	def _read_bram_banks(self, bram: Banks) -> None:
 		self._access_bram_banks(bram, True)
 	
-	def _write_bram_banks(self, bram: Iterable[Bank]) -> None:
+	def _write_bram_banks(self, bram: Banks) -> None:
 		self._access_bram_banks(bram, False)
 	
-	def _access_bram_banks(self, bram: Iterable[Bank], read: bool) -> None:
+	def _access_bram_banks(self, bram: Banks, read: bool) -> None:
 		for bank_nr, bram_bank in enumerate(bram):
 			top = bank_nr%2 == 1
 			tile_x = self._spec.bram_cols[bank_nr//2]
