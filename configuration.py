@@ -6,6 +6,7 @@ from array import array
 import timeit
 import enum
 
+from dataclasses import dataclass
 from io import BytesIO
 from itertools import zip_longest
 from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
@@ -29,6 +30,10 @@ class FreqRange(enum.IntEnum):
 class MalformedBitstreamError(Exception):
 	"""Raised when an not incorrect bitstream is encountered."""
 	pass
+
+@dataclass
+class BinOpt:
+	bram_chunk_size: int = 128
 
 class CRC:
 	def __init__(self) -> None:
@@ -546,7 +551,7 @@ class Configuration:
 		
 		return bitstream
 	
-	def write_bin(self, bin_file: BinaryIO):
+	def write_bin(self, bin_file: BinaryIO, opt: BinOpt=BinOpt()):
 		cram = self._get_cram_banks()
 		bram = self._get_bram_banks()
 		
@@ -580,7 +585,7 @@ class Configuration:
 			bin_out.write_cram(cram)
 		
 		# write BRAM
-		chunk_size = 128
+		chunk_size = opt.bram_chunk_size
 		bin_out.set_bank_width(self._spec.bram_width)
 		bin_out.set_bank_height(chunk_size)
 		for bank_number in range(len(bram)):
