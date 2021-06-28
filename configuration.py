@@ -112,22 +112,34 @@ class BinOut:
 			wn |= WARMBOOT_MASK
 		self.write_bytes(bytes([wn]))
 	
-	def set_bank_number(self, number: int) -> None:
+	def set_bank_number(self, number: int, reuse: bool=False) -> None:
+		if reuse and self._bank_number == number:
+			return
+		
 		self.write_bytes(b"\x11")
 		self.write_bytes(bytes([number]))
 		self._bank_number = number
 	
-	def set_bank_width(self, width: int) -> None:
+	def set_bank_width(self, width: int, reuse: bool=False) -> None:
+		if reuse and self._bank_width == width:
+			return
+		
 		self.write_bytes(b"\x62")
 		self.write_bytes((width-1).to_bytes(2, "big"))
 		self._bank_width = width
 	
-	def set_bank_height(self, height: int) -> None:
+	def set_bank_height(self, height: int, reuse: bool=False) -> None:
+		if reuse and self._bank_height == height:
+			return
+		
 		self.write_bytes(b"\x72")
 		self.write_bytes(height.to_bytes(2, "big"))
 		self._bank_height = height
 	
-	def set_bank_offset(self, offset: int) -> None:
+	def set_bank_offset(self, offset: int, reuse: bool=False) -> None:
+		if reuse and self._bank_offset == offset:
+			return
+		
 		self.write_bytes(b"\x82")
 		self.write_bytes(offset.to_bytes(2, "big"))
 		self._bank_offset = offset
