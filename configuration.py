@@ -34,6 +34,7 @@ class MalformedBitstreamError(Exception):
 @dataclass
 class BinOpt:
 	bram_chunk_size: int = 128
+	skip_bram: bool = False
 
 class CRC:
 	def __init__(self) -> None:
@@ -601,18 +602,19 @@ class Configuration:
 			bin_out.write_cram(cram)
 		
 		# write BRAM
-		chunk_size = opt.bram_chunk_size
-		bin_out.set_bank_width(self._spec.bram_width)
-		for bank_number in range(len(bram)):
-			# may be set to value different from chunk_size by previous bank to write last, smaller chunk
-			if bin_out.bank_height != chunk_size:
-				bin_out.set_bank_height(chunk_size)
-			bin_out.set_bank_number(bank_number)
-			for bank_offset in range(0, self._spec.bram_height, chunk_size):
-				if bank_offset + chunk_size > self._spec.bram_height:
-					bin_out.set_bank_height(self._spec.bram_height - bank_offset)
-				bin_out.set_bank_offset(bank_offset)
-				bin_out.write_bram(bram)
+		if not opt.skip_bram:
+			chunk_size = opt.bram_chunk_size
+			bin_out.set_bank_width(self._spec.bram_width)
+			for bank_number in range(len(bram)):
+				# may be set to value different from chunk_size by previous bank to write last, smaller chunk
+				if bin_out.bank_height != chunk_size:
+					bin_out.set_bank_height(chunk_size)
+				bin_out.set_bank_number(bank_number)
+				for bank_offset in range(0, self._spec.bram_height, chunk_size):
+					if bank_offset + chunk_size > self._spec.bram_height:
+						bin_out.set_bank_height(self._spec.bram_height - bank_offset)
+					bin_out.set_bank_offset(bank_offset)
+					bin_out.write_bram(bram)
 		
 		# CRC check
 		bin_out.crc_check()

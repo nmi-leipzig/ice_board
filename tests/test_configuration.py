@@ -9,7 +9,7 @@ import json
 import unittest
 import numpy as np
 
-from ..configuration import Configuration
+from ..configuration import BinOpt, Configuration
 from ..device_data import TilePosition, BRAMMode, Bit
 
 sys.path.append("/usr/local/bin")
@@ -408,6 +408,30 @@ class ConfigurationTest(unittest.TestCase):
 			path = self.get_data(asc_filename, must_exist=True)
 			with open(path, "r") as asc_file:
 				yield asc_file
+	
+	def test_skip_bram(self):
+		for bin_file, asc_file in self.iter_bin_asc_pairs():
+			with self.subTest(asc_name=os.path.basename(asc_file.name)):
+				out_filename = f"tmp.test_skip_bram.{os.path.basename(bin_file.name)}"
+				
+				exp = Configuration.create_blank()
+				exp.read_asc(asc_file)
+				for tile_pos in exp._bram:
+					exp.set_bram_values(tile_pos, [0]*256, 0, BRAMMode.BRAM_256x16)
+				
+				dut = Configuration.create_blank()
+				dut.read_bin(bin_file)
+				with open(out_filename, "wb") as out_file:
+					dut.write_bin(out_file, BinOpt(skip_bram = True))
+				
+				res = Configuration.create_blank()
+				with open(out_filename, "rb") as out_file:
+					res.read_bin(out_file)
+				
+				self.check_configuration(exp, res)
+				
+				os.remove(out_filename)
+		
 	
 	def test_access_bram_matching(self):
 		# test that reading and writing BRAM banks go together
