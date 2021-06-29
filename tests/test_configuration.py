@@ -306,34 +306,26 @@ class ConfigurationTest(unittest.TestCase):
 				self.generic_read_bin_test(base_name)
 	
 	def test_read_bin_pairs(self):
-		test_files = [
-			("echo.bin", "echo.asc"),
-			("send_all_bram.256x16.25_27.bin", "send_all_bram.256x16.25_27.asc"),
-		]
-		
-		for bin_filename, asc_filename in test_files:
-			with self.subTest(asc=asc_filename):
-				bin_path = self.get_data(bin_filename, must_exist=True)
-				asc_path = self.get_data(asc_filename, must_exist=True)
+		for bin_file, asc_file in self.iter_bin_asc_pairs():
+			with self.subTest(asc_name=os.path.basename(asc_file.name)):
 				dut = Configuration.create_blank()
 				
 				# read bin
-				with open(bin_path, "rb") as bin_file:
-					dut.read_bin(bin_file)
+				dut.read_bin(bin_file)
 				
 				# write asc
-				out_filename = f"tmp.test_read_bin_asc.{bin_filename}.asc"
+				out_filename = f"tmp.test_read_bin_asc.{os.path.basename(bin_file.name)}.asc"
 				with open(out_filename, "w") as out_file:
 					dut. write_asc(out_file)
 				
 				# compare asc
-				with open(asc_path, "r") as exp_file, open(out_filename, "r") as res_file:
-					self.assert_structural_equal(exp_file, res_file)
+				with open(out_filename, "r") as res_file:
+					self.assert_structural_equal(asc_file, res_file)
 				
 				# read ref asc
+				asc_file.seek(0)
 				exp_config = Configuration.create_blank()
-				with open(asc_path, "r") as exp_file:
-					exp_config.read_asc(exp_file)
+				exp_config.read_asc(asc_file)
 				
 				# compare configurations
 				self.check_configuration(exp_config, dut)
@@ -398,6 +390,7 @@ class ConfigurationTest(unittest.TestCase):
 		pairs = [
 			("echo.bin", "echo.asc"),
 			("send_all_bram.256x16.25_27.bin", "send_all_bram.256x16.25_27.asc"),
+			("read_bram_random.bin", "read_bram_random.asc"),
 		]
 		
 		for bin_filename, asc_filename in pairs:
@@ -410,7 +403,7 @@ class ConfigurationTest(unittest.TestCase):
 	def iter_asc_files(self):
 		for asc_filename in [
 			"send_all_bram.256x16.25_27.asc", "send_all_bram.256x16.asc", "send_all_bram.512x8.asc", 
-			"send_all_bram.1024x4.asc", "send_all_bram.2048x2.asc", "echo.asc",
+			"send_all_bram.1024x4.asc", "send_all_bram.2048x2.asc", "echo.asc", "read_bram_random.asc",
 		]:
 			path = self.get_data(asc_filename, must_exist=True)
 			with open(path, "r") as asc_file:
