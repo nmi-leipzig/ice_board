@@ -431,6 +431,28 @@ class ConfigurationTest(unittest.TestCase):
 				self.check_configuration(exp, res)
 				
 				os.remove(out_filename)
+	
+	def test_optimize(self):
+		prev = {}
+		for opt_lvl in range(2):
+			with self.subTest(opt_lvl=opt_lvl):
+				print(f"opt level: {opt_lvl}")
+				for bin_file, asc_file in self.iter_bin_asc_pairs():
+					out_filename = f"tmp.test_optimization.{os.path.basename(bin_file.name)}"
+					dut = Configuration.create_blank()
+					dut.read_asc(asc_file)
+					with open(out_filename, "wb") as out_file:
+						dut.write_bin(out_file, BinOpt(optimize = opt_lvl))
+					
+					new_size = os.path.getsize(out_filename)
+					try:
+						self.assertGreaterEqual(prev[out_filename], new_size)
+					except KeyError:
+						pass
+					prev[out_filename] = new_size
+					print(f"{os.path.basename(bin_file.name)}: {os.path.getsize(bin_file.name)} -> {new_size}")
+					
+					os.remove(out_filename)
 		
 	
 	def test_access_bram_matching(self):
