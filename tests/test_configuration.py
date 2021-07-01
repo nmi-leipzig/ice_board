@@ -6,11 +6,14 @@ from typing import NamedTuple, List
 import time
 import json
 
+from io import BytesIO
+
 import unittest
 import numpy as np
 
 from ..configuration import BinOpt, Configuration
 from ..device_data import TilePosition, BRAMMode, Bit
+from ..fpga_board import FPGABoard
 
 sys.path.append("/usr/local/bin")
 def load_icebox():
@@ -490,7 +493,7 @@ class ConfigurationTest(unittest.TestCase):
 		prev = {}
 		for opt_lvl in range(5):
 			with self.subTest(opt_lvl=opt_lvl):
-				print(f"opt level: {opt_lvl}")
+				#print(f"opt level: {opt_lvl}")
 				for bin_file, asc_file in self.iter_bin_asc_pairs():
 					out_filename = f"tmp.test_optimization.{os.path.basename(bin_file.name)}"
 					dut = Configuration.create_blank()
@@ -505,7 +508,7 @@ class ConfigurationTest(unittest.TestCase):
 					except KeyError:
 						pass
 					prev[out_filename] = new_size
-					print(f"{os.path.basename(bin_file.name)}: {os.path.getsize(bin_file.name)} -> {new_size}")
+					#print(f"{os.path.basename(bin_file.name)}: {os.path.getsize(bin_file.name)} -> {new_size}")
 					
 					exp = Configuration.create_blank()
 					exp.read_asc(asc_file)
@@ -518,6 +521,31 @@ class ConfigurationTest(unittest.TestCase):
 					
 					os.remove(out_filename)
 		
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	def test_options_with_hardware(self):
+		path = self.get_data("read_bram_random.bin", must_exist=True)
+		test_cases = [
+			("default", BinOpt()),
+			("smallest", BinOpt(skip_comment=True, skip_unused_bram=True, optimize=4)),
+		]
+		for desc, bin_opt in test_cases:
+			with self.subTest(desc=desc):
+				dut = Configuration.create_blank()
+				with open(path, "rb") as bin_file:
+					dut.read_bin(bin_file)
+				
+				with BytesIO() as tmp_file:
+					dut.write_bin(tmp_file, bin_opt)
+					bitstream = tmp_file.getvalue()
+				#print(f"{os.path.getsize(path)} -> {len(bitstream)}")
+				
+				with FPGABoard.get_suitable_board() as fpga:
+					fpga.flash_bitstream(bitstream)
+					for i, tile in enumerate(sorted(dut._bram)):
+						fpga.uart.write(i.to_bytes(1, "little"))
+						val = fpga.read_integers(256, data_width=2)
+						exp = dut.get_bram_values(tile, 0, 256, BRAMMode.BRAM_256x16)
+						self.assertEqual(exp, val)
 	
 	def test_access_bram_matching(self):
 		# test that reading and writing BRAM banks go together
