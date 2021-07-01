@@ -140,9 +140,18 @@ class ConfigurationTest(unittest.TestCase):
 			given_col = getattr(config, col_name)
 			self.assertEqual(expected_col, given_col, f"Contents of {col_name} differ from expected values:")
 	
-	def check_configuration(self, exp_config, config):
+	def check_configuration(self, exp_config, config, check_bram=True, check_cram=True, check_comment=True):
 		# assert two Configuration instances are equal
-		for var_name in ["_bram", "_tiles", "_comment", "_freq_range", "_warmboot", "_nosleep", "_extra_bits"]:
+		to_check = ["_freq_range", "_warmboot", "_nosleep", ]
+		if check_bram:
+			to_check.append("_bram")
+		if check_cram:
+			to_check.append("_tiles")
+			to_check.append("_extra_bits")
+		if check_comment:
+			to_check.append("_comment")
+		
+		for var_name in to_check:
 			exp_value = getattr(exp_config, var_name)
 			value = getattr(config, var_name)
 			np.testing.assert_equal(exp_value, value, f"Contents of {var_name} differ from expected values:")
