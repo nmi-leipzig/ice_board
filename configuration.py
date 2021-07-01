@@ -37,6 +37,7 @@ class BinOpt:
 	skip_bram: bool = False
 	skip_unused_bram: bool = False
 	optimize: int = 0
+	skip_comment: bool = False
 
 class CRC:
 	def __init__(self) -> None:
@@ -579,7 +580,10 @@ class Configuration:
 		reuse = opt.optimize > 0
 		
 		# comment
-		bin_out.write_comment(self._comment)
+		comment = self._comment
+		if opt.skip_comment:
+			comment = None
+		bin_out.write_comment(comment)
 		
 		# preamble
 		bin_out.write_preamble()

@@ -458,7 +458,30 @@ class ConfigurationTest(unittest.TestCase):
 				with open(out_filename, "rb") as out_file:
 					res.read_bin(out_file)
 				
-				print(f"{os.path.basename(bin_file.name)}: {os.path.getsize(bin_file.name)} -> {os.path.getsize(out_filename)}")
+				#print(f"{os.path.basename(bin_file.name)}: {os.path.getsize(bin_file.name)} -> {os.path.getsize(out_filename)}")
+				self.check_configuration(exp, res)
+				
+				os.remove(out_filename)
+	
+	def test_skip_comment(self):
+		for bin_file, asc_file in self.iter_bin_asc_pairs():
+			with self.subTest(asc_name=os.path.basename(asc_file.name)):
+				out_filename = f"tmp.test_skip_comment.{os.path.basename(bin_file.name)}"
+				
+				exp = Configuration.create_blank()
+				exp.read_asc(asc_file)
+				exp._comment = ""
+				
+				dut = Configuration.create_blank()
+				dut.read_bin(bin_file)
+				with open(out_filename, "wb") as out_file:
+					dut.write_bin(out_file, BinOpt(skip_comment = True))
+				
+				res = Configuration.create_blank()
+				with open(out_filename, "rb") as out_file:
+					res.read_bin(out_file)
+				
+				#print(f"{os.path.basename(bin_file.name)}: {os.path.getsize(bin_file.name)} -> {os.path.getsize(out_filename)}")
 				self.check_configuration(exp, res)
 				
 				os.remove(out_filename)
