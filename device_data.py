@@ -23,6 +23,12 @@ class ExtraBit(NamedTuple):
 	x: int
 	y: int
 
+class BRAMIndicator(NamedTuple):
+	"""Indicator for usage of certain BRAM block"""
+	offset: TilePosition
+	bit: Bit
+	value: bool
+
 @dataclass(frozen=True)
 class DeviceSpec:
 	asc_name: str
@@ -35,6 +41,7 @@ class DeviceSpec:
 	bram_height: int
 	
 	bram_cols: Tuple[int, ...]
+	bram_indicator: BRAMIndicator
 	tile_type_width: Dict[TileType, int]
 	extra_bits: Tuple[ExtraBit, ...]
 	
@@ -72,6 +79,7 @@ SPECS = (
 		128,
 		256,
 		(8, 25),
+		BRAMIndicator(TilePosition(0, 0), Bit(1, 7), True),
 		{TileType.IO: 18, TileType.RAM_T: 42, TileType.RAM_B: 42, TileType.LOGIC: 54},
 		(
 			ExtraBit(0, 870, 270), ExtraBit(0, 871, 270), ExtraBit(1, 870, 271), ExtraBit(1, 871, 271),
