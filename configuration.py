@@ -35,6 +35,7 @@ class MalformedBitstreamError(Exception):
 class BinOpt:
 	bram_chunk_size: int = 128
 	skip_bram: bool = False
+	skip_unused_bram: bool = False
 	optimize: int = 0
 
 class CRC:
@@ -637,6 +638,9 @@ class Configuration:
 			chunk_size = opt.bram_chunk_size
 			bin_out.set_bank_width(self._spec.bram_width)
 			for bank_number in range(len(bram)):
+				if opt.skip_unused_bram and not self._bram_bank_used(bank_number):
+					continue
+				
 				# may be set to value different from chunk_size by previous bank to write last, smaller chunk
 				if bin_out.bank_height != chunk_size:
 					bin_out.set_bank_height(chunk_size, reuse)
@@ -655,6 +659,17 @@ class Configuration:
 		
 		# padding
 		bin_out.write_bytes(b"\x00")
+	
+	def _bram_bank_used(self, bank_number: int) -> bool:
+		tile_x = self._spec.bram_cols[bank_number//2]
+		y_offset = (self._spec.max_y-1)//2 if bank_number%2 == 1 else 0
+		indi = self._spec.bram_indicator
+		for block_nr in range(self._spec.bram_width//16):
+			tile_y = block_nr*2 + 1 + y_offset
+			if self.get_bit(tile_x+indi.offset.x, tile_y+indi.offset.y, *indi.bit) == indi.value:
+				return True
+		
+		return False
 	
 	def _read_cram_banks(self, cram: Banks) -> None:
 		self._access_cram_banks(cram, True)
