@@ -601,8 +601,36 @@ class Configuration:
 		
 		# write CRAM
 		for bank_number in range(len(cram)):
+			if opt.optimize >= 2 and np.all(cram[bank_number] == False):
+				continue
+			
 			bin_out.set_bank_number(bank_number, reuse)
-			bin_out.write_cram(cram)
+			if opt.optimize < 3:
+				# write whole bank at once
+				bin_out.write_cram(cram)
+				continue
+			
+			# find none False rows
+			to_write = np.any(cram[bank_number], axis=1)
+			#print(np.nonzero(to_write))
+			prev_write = np.roll(to_write, 1)
+			prev_write[0] = False
+			next_write = np.roll(to_write, -1)
+			next_write[-1] = False
+			first_indices = np.nonzero(to_write & ~prev_write)[0]
+			last_indices = np.nonzero(to_write & ~next_write)[0]
+			chunk_size = last_indices - first_indices + 1
+			areas = np.column_stack((first_indices, chunk_size))
+			
+			if opt.optimize >= 4:
+				# sort by chunk size to set bank height less often
+				areas = areas[areas[:, 1].argsort()]
+			
+			for bank_offset, bank_height in areas:
+				#print(f"{bank_offset}, {bank_height}")
+				bin_out.set_bank_height(int(bank_height), True)
+				bin_out.set_bank_offset(int(bank_offset), True)
+				bin_out.write_cram(cram)
 		
 		# write BRAM
 		if not opt.skip_bram:
