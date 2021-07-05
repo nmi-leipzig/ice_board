@@ -512,12 +512,12 @@ class Configuration:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, cram)
-					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after CRAM data, got 0x{val:04x}")
+					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp} after CRAM data, got 0x{val}")
 				elif payload == 3:
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, bram)
-					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp:04x} after BRAM data, got 0x{val:04x}")
+					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp} after BRAM data, got 0x{val}")
 				elif payload == 5:
 					crc.reset()
 				elif payload == 6:
