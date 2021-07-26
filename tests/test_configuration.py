@@ -63,9 +63,32 @@ class ConfigurationTest(unittest.TestCase):
 	def test_creation(self):
 		config = Configuration.create_blank()
 	
+	def test_create_from_asc_filename(self):
+		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
+		config = Configuration.create_from_asc_filename(asc_path)
+		
+		# check logic cell
+		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
+		with open(data_path, "r") as data_file:
+			data = json.load(data_file)
+		tile_pos = TilePosition(*data[0])
+		
+		tile_data = np.array(data[1])
+		
+		np.testing.assert_equal(tile_data, config._tiles[tile_pos])
+		
+		# check bram
+		bram_pos = TilePosition(*data[2])
+		bram_data = np.array(data[3])
+		
+		np.testing.assert_equal(bram_data, config._bram[bram_pos][:len(bram_data)])
+		rest = np.full((len(config._bram[bram_pos])-len(bram_data), len(bram_data[0])), False)
+		np.testing.assert_equal(rest, config._bram[bram_pos][len(bram_data):])
+	
 	def test_create_from_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		config = Configuration.create_from_asc(asc_path)
+		with open(asc_path, "r") as asc_file:
+			config = Configuration.create_from_asc(asc_file)
 		
 		# check logic cell
 		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
@@ -87,7 +110,7 @@ class ConfigurationTest(unittest.TestCase):
 	
 	def test_write_asc(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		config = Configuration.create_from_asc(asc_path)
+		config = Configuration.create_from_asc_filename(asc_path)
 		
 		with open(asc_path, "r") as org, open("tmp.test_write_asc.asc", "w+") as res:
 			config.write_asc(res)
@@ -100,7 +123,7 @@ class ConfigurationTest(unittest.TestCase):
 		import icebox
 		
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		config = Configuration.create_from_asc(asc_path)
+		config = Configuration.create_from_asc_filename(asc_path)
 		
 		expected_ic = icebox.iceconfig()
 		expected_ic.read_file(asc_path)
@@ -161,7 +184,7 @@ class ConfigurationTest(unittest.TestCase):
 	
 	def test_get_bit(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		config = Configuration.create_from_asc(asc_path)
+		config = Configuration.create_from_asc_filename(asc_path)
 		
 		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
 		with open(data_path, "r") as data_file:
@@ -178,7 +201,7 @@ class ConfigurationTest(unittest.TestCase):
 	
 	def test_get_bits(self):
 		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		config = Configuration.create_from_asc(asc_path)
+		config = Configuration.create_from_asc_filename(asc_path)
 		
 		data_path = self.get_data("send_all_bram.512x8.json", must_exist=True)
 		with open(data_path, "r") as data_file:
@@ -234,7 +257,7 @@ class ConfigurationTest(unittest.TestCase):
 		for current in sbm:
 			with self.subTest(mode=current.mode):
 				asc_path = self.get_data(current.asc_filename, must_exist=True)
-				config = Configuration.create_from_asc(asc_path)
+				config = Configuration.create_from_asc_filename(asc_path)
 				
 				# read single
 				for address, expected in enumerate(current.initial_data):
@@ -251,7 +274,7 @@ class ConfigurationTest(unittest.TestCase):
 		for current in sbm:
 			with self.subTest(mode=current.mode):
 				asc_path = self.get_data(current.asc_filename, must_exist=True)
-				config = Configuration.create_from_asc(asc_path)
+				config = Configuration.create_from_asc_filename(asc_path)
 				
 				expected = list(current.initial_data)
 				# write single

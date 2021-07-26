@@ -859,16 +859,20 @@ class Configuration:
 		return config
 	
 	@classmethod
-	def create_from_asc(cls, asc_filename: str) -> "Configuration":
+	def create_from_asc_filename(cls, asc_filename: str) -> "Configuration":
 		with open(asc_filename, "r") as asc_file:
-			asc_name = cls.device_from_asc(asc_file)
-			config = cls.create_blank(asc_name)
-			
-			# reset for parsing
-			asc_file.seek(0)
-			
-			config.read_asc(asc_file)
-			return config
+			return cls.create_from_asc(asc_file)
+	
+	@classmethod
+	def create_from_asc(cls, asc_file: TextIO) -> "Configuration":
+		asc_name = cls.device_from_asc(asc_file)
+		config = cls.create_blank(asc_name)
+		
+		# reset for parsing
+		asc_file.seek(0)
+		
+		config.read_asc(asc_file)
+		return config
 	
 	@staticmethod
 	def device_from_asc(asc_file: TextIO) -> str:
