@@ -1,5 +1,5 @@
 
-from .configuration import Configuration, ExtraBit
+from .configuration import BinOpt, Configuration, ExtraBit
 from .device_data import BRAMMode, TileType, TilePosition, Bit, SPECS, SPECS_BY_ASC
 from .fpga_board import FPGABoard, ConfigurationError
 from .fpga_manager import FPGAManager
