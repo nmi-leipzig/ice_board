@@ -564,9 +564,9 @@ class Configuration:
 		
 		return bram
 	
-	def get_bitstream(self) -> bytes:
+	def get_bitstream(self, opt: BinOpt=BinOpt()) -> bytes:
 		with BytesIO() as bin_file:
-			self.write_bin(bin_file)
+			self.write_bin(bin_file, opt)
 			bitstream = bin_file.getvalue()
 		
 		return bitstream
