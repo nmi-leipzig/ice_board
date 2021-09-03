@@ -33,6 +33,7 @@ class MalformedBitstreamError(Exception):
 
 @dataclass
 class BinOpt:
+	"""Options for binary bitstream creation"""
 	bram_chunk_size: int = 128
 	skip_bram: bool = False
 	skip_unused_bram: bool = False
@@ -75,7 +76,7 @@ class BinOut:
 		return self._bank_height
 	
 	def write_bytes(self, data: bytes) -> None:
-		"""Write bytes, update CRC accordingly"""
+		"""Writes bytes, updates CRC accordingly"""
 		count = self._bin_file.write(data)
 		
 		if count != len(data):
@@ -107,7 +108,7 @@ class BinOut:
 		self._crc.reset()
 	
 	def write_warmboot(self, warmboot: bool, nosleep: bool) -> None:
-		"""Write warmboot and nosleep flags"""
+		"""Writes warmboot and nosleep flags"""
 		self.write_bytes(b"\x92\x00")
 		wn = 0
 		if nosleep:
@@ -181,7 +182,7 @@ TILE_TYPE_TO_ASC_ENTRY = {
 ASC_ENTRY_TO_TILE_TYPE = {a:t for t, a in TILE_TYPE_TO_ASC_ENTRY.items()}
 
 class Configuration:
-	"""represents the configuration of a FPGA"""
+	"""Represents the configuration of a FPGA"""
 	
 	def __init__(self, device_spec: DeviceSpec) -> None:
 		self._spec = device_spec
@@ -413,7 +414,7 @@ class Configuration:
 			asc_file.write(f".extra_bit {extra_bit.bank} {extra_bit.x} {extra_bit.y}\n")
 	
 	def _all_blank_cram_banks(self) -> Banks:
-		"""Create all CRAM banks as used in binary bitstreams with all bits set to 0.
+		"""Creates all CRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
 		x dimension.
@@ -421,7 +422,7 @@ class Configuration:
 		return np.full((4, self._spec.cram_height, self._spec.cram_width), False, dtype=bool)
 	
 	def _all_blank_bram_banks(self) -> Banks:
-		"""Create all BRAM banks as used in binary bitstreams with all bits set to 0.
+		"""Creates all BRAM banks as used in binary bitstreams with all bits set to 0.
 		
 		Attention: the access to the bank b at x, y is reached by banks[b][y][x] to easier group the bits in the
 		x dimension.
@@ -429,10 +430,11 @@ class Configuration:
 		return np.full((4, self._spec.bram_height, self._spec.bram_width), False, dtype=bool)
 	
 	def read_bin(self, bin_file: BinaryIO):
+		"""Reads binary bitstream"""
 		crc = CRC()
 		self.expect_bytes(bin_file, b"\xff\x00", crc, "Didn't start with {exp}, but {val}")
 		
-		# read multiple null terminated comment
+		# read multiple null terminated comments
 		com_list = []
 		prv = b"\x00" # from 0xFF00
 		cur = self.get_bytes_crc(bin_file, 1, crc)
@@ -565,6 +567,7 @@ class Configuration:
 		return bram
 	
 	def get_bitstream(self, opt: BinOpt=BinOpt()) -> bytes:
+		"""Returns binary bitstream"""
 		with BytesIO() as bin_file:
 			self.write_bin(bin_file, opt)
 			bitstream = bin_file.getvalue()
@@ -572,6 +575,7 @@ class Configuration:
 		return bitstream
 	
 	def write_bin(self, bin_file: BinaryIO, opt: BinOpt=BinOpt()):
+		"""Writes binary bitstream"""
 		cram = self._get_cram_banks()
 		bram = self._get_bram_banks()
 		
@@ -820,6 +824,7 @@ class Configuration:
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
+		"""Reads bytes and raise exception if they do not match the expected values"""
 		val = cls.get_bytes_crc(bin_file, len(exp), crc)
 		
 		if exp != val:
@@ -827,13 +832,14 @@ class Configuration:
 	
 	@classmethod
 	def get_bytes_crc(cls, bin_file: BinaryIO, size: int, crc: CRC) -> bytes:
-		"""Get a specific number of bytes and update a CRC"""
+		"""Gets a specific number of bytes and update a CRC"""
 		res = cls.get_bytes(bin_file, size)
 		crc.update(res)
 		return res
 	
 	@staticmethod
 	def get_bytes(bin_file: BinaryIO, size: int) -> bytes:
+		"""Get a specific number of bytes"""
 		res = bin_file.read(size)
 		
 		if len(res) < size:
@@ -853,6 +859,7 @@ class Configuration:
 	
 	@classmethod
 	def create_blank(cls, asc_name: str="8k") -> "Configuration":
+		"""Creates an empty configuration"""
 		spec = SPECS_BY_ASC[asc_name]
 		config = cls(spec)
 		
@@ -876,6 +883,7 @@ class Configuration:
 	
 	@staticmethod
 	def device_from_asc(asc_file: TextIO) -> str:
+		"""Extracts the device from an ASC file"""
 		for line in asc_file:
 			line = line.strip()
 			if line.startswith(".device"):
