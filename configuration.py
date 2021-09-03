@@ -28,7 +28,7 @@ class FreqRange(enum.IntEnum):
 	HIGH = 2
 
 class MalformedBitstreamError(Exception):
-	"""Raised when an not incorrect bitstream is encountered."""
+	"""Raised when an incorrect bitstream is encountered."""
 	pass
 
 @dataclass
