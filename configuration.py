@@ -85,14 +85,16 @@ class BinOut:
 		self._crc.update(data)
 	
 	def write_comment(self, comment: str) -> None:
+		if not comment:
+			return
+		
 		self.write_bytes(b"\xff\x00")
 		
-		if comment:
-			if comment[-1] == "\n":
-				comment = comment[:-1]
-			for line in comment.split("\n"):
-				self.write_bytes(line.encode("utf-8"))
-				self.write_bytes(b"\x00")
+		if comment[-1] == "\n":
+			comment = comment[:-1]
+		for line in comment.split("\n"):
+			self.write_bytes(line.encode("utf-8"))
+			self.write_bytes(b"\x00")
 		
 		self.write_bytes(b"\x00\xff")
 	
