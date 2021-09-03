@@ -368,6 +368,19 @@ class ConfigurationTest(unittest.TestCase):
 				# clean up
 				os.remove(out_filename)
 	
+	def test_read_no_header(self):
+		# read bitstream without comment field
+		dut = Configuration.create_blank()
+		
+		bin_path = self.get_data("smallest.bin", must_exist=True)
+		
+		with open(bin_path, "rb") as bin_file:
+			dut.read_bin(bin_file)
+			
+			exp_config = Configuration.create_blank()
+			
+			self.check_configuration(exp_config, dut)
+	
 	def test_get_bitstream(self):
 		for bin_file, asc_file in self.iter_bin_asc_pairs():
 			with self.subTest(asc_name=asc_file.name):

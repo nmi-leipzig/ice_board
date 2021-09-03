@@ -434,39 +434,44 @@ class Configuration:
 	def read_bin(self, bin_file: BinaryIO):
 		"""Reads binary bitstream"""
 		crc = CRC()
-		self.expect_bytes(bin_file, b"\xff\x00", crc, "Didn't start with {exp}, but {val}")
 		
-		# read multiple null terminated comments
-		com_list = []
-		prv = b"\x00" # from 0xFF00
-		cur = self.get_bytes_crc(bin_file, 1, crc)
-		while True:
-			while cur != b"\x00":
-				com_list.append(cur)
-				prv = cur
-				cur = self.get_bytes_crc(bin_file, 1, crc)
-			
-			nxt = self.get_bytes_crc(bin_file, 1, crc)
-			if nxt == b"\xff":
-				if prv == b"\x00":
-					# previous string null terminated and received 0x00FF
-					# -> normal end of comment
-					break
+		start_word = self.get_bytes_crc(bin_file, 2, crc)
+		if start_word == b"\xff\x00":
+			# read multiple null terminated comments
+			com_list = []
+			prv = b"\x00" # from 0xFF00
+			cur = self.get_bytes_crc(bin_file, 1, crc)
+			while True:
+				while cur != b"\x00":
+					com_list.append(cur)
+					prv = cur
+					cur = self.get_bytes_crc(bin_file, 1, crc)
+				
+				nxt = self.get_bytes_crc(bin_file, 1, crc)
+				if nxt == b"\xff":
+					if prv == b"\x00":
+						# previous string null terminated and received 0x00FF
+						# -> normal end of comment
+						break
+					else:
+						# previous string not null terminated
+						# -> Lattice bug that shifts 0x00FF some bytes into comments
+						com_list.append(b"\n")
+						break
 				else:
-					# previous string not null terminated
-					# -> Lattice bug that shifts 0x00FF some bytes into comments
-					com_list.append(b"\n")
-					break
-			else:
-				# another comment string
-				prv = cur
-				cur = nxt
-			com_list.append(b"\n")
-		
-		self._comment = b"".join(com_list).decode("utf-8")
+					# another comment string
+					prv = cur
+					cur = nxt
+				com_list.append(b"\n")
+			
+			self._comment = b"".join(com_list).decode("utf-8")
+			last_four = [None]*4
+		else:
+			# no comment
+			self._comment = ""
+			last_four = [None, None, start_word[:1], start_word[1:]]
 		
 		# as Lattice' own tools create faulty comments just search for preamble instead of expecting it
-		last_four = [None]*4
 		while last_four != [b"\x7e", b"\xaa", b"\x99", b"\x7e"]:
 			last_four = last_four[1:]
 			last_four.append(self.get_bytes_crc(bin_file, 1, crc))
