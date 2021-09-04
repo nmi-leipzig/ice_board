@@ -470,7 +470,7 @@ class ConfigurationTest(unittest.TestCase):
 				dut = Configuration.create_blank()
 				dut.read_bin(bin_file)
 				with open(out_filename, "wb") as out_file:
-					dut.write_bin(out_file, BinOpt(skip_bram = True))
+					dut.write_bin(out_file, BinOpt(detect_used_bram=False, bram_banks=[]))
 				
 				res = Configuration.create_blank()
 				with open(out_filename, "rb") as out_file:
@@ -491,7 +491,7 @@ class ConfigurationTest(unittest.TestCase):
 				dut = Configuration.create_blank()
 				dut.read_bin(bin_file)
 				with open(out_filename, "wb") as out_file:
-					dut.write_bin(out_file, BinOpt(skip_unused_bram = True))
+					dut.write_bin(out_file, BinOpt(detect_used_bram=True))
 				
 				res = Configuration.create_blank()
 				with open(out_filename, "rb") as out_file:
@@ -514,7 +514,7 @@ class ConfigurationTest(unittest.TestCase):
 				dut = Configuration.create_blank()
 				dut.read_bin(bin_file)
 				with open(out_filename, "wb") as out_file:
-					dut.write_bin(out_file, BinOpt(skip_comment = True))
+					dut.write_bin(out_file, BinOpt(skip_comment=True))
 				
 				res = Configuration.create_blank()
 				with open(out_filename, "rb") as out_file:
@@ -562,7 +562,7 @@ class ConfigurationTest(unittest.TestCase):
 		path = self.get_data("read_bram_random.bin", must_exist=True)
 		test_cases = [
 			("default", BinOpt()),
-			("smallest", BinOpt(skip_comment=True, skip_unused_bram=True, optimize=4)),
+			("smallest", BinOpt(skip_comment=True, detect_used_bram=False, bram_banks=[], optimize=4)),
 		]
 		for desc, bin_opt in test_cases:
 			with self.subTest(desc=desc):

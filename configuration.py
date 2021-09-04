@@ -4,12 +4,12 @@ import binascii
 import os
 from array import array
 import timeit
-import enum
 
 from dataclasses import dataclass
+from enum import Enum, IntEnum
 from io import BytesIO
 from itertools import zip_longest
-from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Sequence, TextIO, Tuple
+from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Optional, Sequence, TextIO, Tuple
 
 import numpy as np
 
@@ -17,7 +17,7 @@ from .device_data import Bit, BRAMMode, DeviceSpec, ExtraBit, TilePosition, Tile
 
 Banks = NewType("Banks", np.ndarray)
 
-class FreqRange(enum.IntEnum):
+class FreqRange(IntEnum):
 	"""Values for internal oscillator frequncy range
 	
 	Relevant for configuration in SPI master mode.
@@ -35,8 +35,10 @@ class MalformedBitstreamError(Exception):
 class BinOpt:
 	"""Options for binary bitstream creation"""
 	bram_chunk_size: int = 128
-	skip_bram: bool = False
-	skip_unused_bram: bool = False
+	# detect used BRAM tiles and write the BRAM bank accordingly, if False bram_banks will be used
+	detect_used_bram: bool = False
+	# banks to write, None means write all (!), empty List means skip BRAM, used if detect_used_bram is False
+	bram_banks: Optional[List[int]] = None
 	optimize: int = 0
 	skip_comment: bool = False
 
@@ -296,7 +298,7 @@ class Configuration:
 			address += 1
 	
 	def read_asc(self, asc_file: TextIO) -> None:
-		ASCState = enum.Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])
+		ASCState = Enum("ASCState", ["READ_LINE", "FIND_ENTRY", "READ_TO_NEXT"])
 		state = ASCState.READ_LINE
 		comment_data = []
 		current_data = None
@@ -649,13 +651,17 @@ class Configuration:
 				bin_out.write_cram(cram)
 		
 		# write BRAM
-		if not opt.skip_bram:
+		if opt.detect_used_bram:
+			out_banks = [b for b in range(len(bram)) if self._bram_bank_used(bank_number)]
+		elif opt.bram_banks is None:
+			out_banks = list(range(len(bram)))
+		else:
+			out_banks = opt.bram_banks
+		
+		if len(out_banks):
 			chunk_size = opt.bram_chunk_size
 			bin_out.set_bank_width(self._spec.bram_width)
-			for bank_number in range(len(bram)):
-				if opt.skip_unused_bram and not self._bram_bank_used(bank_number):
-					continue
-				
+			for bank_number in out_banks:
 				# may be set to value different from chunk_size by previous bank to write last, smaller chunk
 				if bin_out.bank_height != chunk_size:
 					bin_out.set_bank_height(chunk_size, reuse)
