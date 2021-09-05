@@ -39,6 +39,12 @@ class BinOpt:
 	detect_used_bram: bool = False
 	# banks to write, None means write all (!), empty List means skip BRAM, used if detect_used_bram is False
 	bram_banks: Optional[List[int]] = None
+	# 0 -> no optimization, write all CRAM, one block per bank
+	# 1 -> set bank width, height, number and offset only if differs from currently set value
+	# 2 -> in addition to 1, skip CRAM banks that only contain zeros
+	# 3 -> in addition to 2, skip CRAM lines that only contain zeros,
+	#      i.e. write only chunks where each line contains at least one one
+	# 4 -> in addition to 3, order writes by chunk size to reduce number of set height commands
 	optimize: int = 0
 	skip_comment: bool = False
 
