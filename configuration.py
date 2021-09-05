@@ -616,19 +616,25 @@ class Configuration:
 		# warmboot & nosleep
 		bin_out.write_warmboot(self._warmboot, self._nosleep)
 		
-		# bank width
-		bin_out.set_bank_width(self._spec.cram_width, reuse)
-		# bank height
-		bin_out.set_bank_height(self._spec.cram_height, reuse)
-		# bank offset
-		bin_out.set_bank_offset(0, reuse)
+		if opt.optimize < 2:
+			out_banks = list(range(len(cram)))
+		else:
+			out_banks = [c for c in range(len(cram)) if np.any(cram[c])]
+		
+		if len(out_banks):
+			# bank width
+			bin_out.set_bank_width(self._spec.cram_width, reuse)
+			# bank height
+			bin_out.set_bank_height(self._spec.cram_height, reuse)
+			
+			if opt.optimize < 3:
+				# bank offset
+				bin_out.set_bank_offset(0, reuse)
 		
 		# write CRAM
-		for bank_number in range(len(cram)):
-			if opt.optimize >= 2 and np.all(cram[bank_number] == False):
-				continue
-			
+		for bank_number in out_banks:
 			bin_out.set_bank_number(bank_number, reuse)
+			
 			if opt.optimize < 3:
 				# write whole bank at once
 				bin_out.write_cram(cram)
