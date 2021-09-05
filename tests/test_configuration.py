@@ -381,6 +381,15 @@ class ConfigurationTest(unittest.TestCase):
 			
 			self.check_configuration(exp_config, dut)
 	
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	def test_flash_empty(self):
+		bin_path = self.get_data("smallest.bin", must_exist=True)
+		with open(bin_path, "rb") as tmp_file:
+			bitstream = tmp_file.read()
+		
+		with FPGABoard.get_suitable_board() as fpga:
+			fpga.flash_bitstream(bitstream)
+	
 	def test_get_bitstream(self):
 		for bin_file, asc_file in self.iter_bin_asc_pairs():
 			with self.subTest(asc_name=asc_file.name):
