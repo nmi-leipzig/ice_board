@@ -112,13 +112,14 @@ class ConfigurationTest(unittest.TestCase):
 		np.testing.assert_equal(rest, config._bram[bram_pos][len(bram_data):])
 	
 	def test_write_asc(self):
-		asc_path = self.get_data("send_all_bram.512x8.asc", must_exist=True)
-		config = Configuration.create_from_asc_filename(asc_path)
-		
-		with open(asc_path, "r") as org, open("tmp.test_write_asc.asc", "w+") as res:
-			config.write_asc(res)
-			res.seek(0)
-			self.assert_structural_equal(org, res)
+		for asc_filename in ["send_all_bram.512x8.asc", "send_all_bram.256x16.no_warmboot.asc"]:
+			asc_path = self.get_data(asc_filename, must_exist=True)
+			config = Configuration.create_from_asc_filename(asc_path)
+			
+			with open(asc_path, "r") as org, open("tmp.test_write_asc.asc", "w+") as res:
+				config.write_asc(res)
+				res.seek(0)
+				self.assert_structural_equal(org, res)
 	
 	@unittest.skipUnless(load_icebox(), "icebox unavailable")
 	def test_write_asc_icestorm(self):

@@ -354,8 +354,9 @@ class Configuration:
 					if self._spec.asc_name != parts[1]:
 						raise ValueError(f"asc for {parts[1]}, not {self._spec.asc_name}")
 				elif entry == "warmboot":
-					assert part[1] in ("enabled", "disabled")
-					self._warmboot = (part[1] == "enabled")
+					if parts[1] not in ("enabled", "disabled"):
+						raise ValueError(f"Invalid value for warmboot: '{parts[1]}'")
+					self._warmboot = (parts[1] == "enabled")
 				elif entry == "sym":
 					# ignore symbols
 					pass
