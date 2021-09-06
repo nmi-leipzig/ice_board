@@ -623,11 +623,10 @@ class ConfigurationTest(unittest.TestCase):
 				
 				with FPGABoard.get_suitable_board() as fpga:
 					# write previous BRAM values
-					fpga.configure(prev_conf)
+					fpga.configure(prev_conf, BinOpt(detect_used_bram=False, bram_banks=None)) # None == no restriction
 					
 					# write send bitstream and the new BRAM values
-					new_bs = send_conf.get_bitstream(BinOpt(detect_used_bram=False, bram_banks=bank_numbers))
-					fpga.flash_bitstream(new_bs)
+					fpga.configure(send_conf, BinOpt(detect_used_bram=False, bram_banks=bank_numbers))
 					
 					for i, pos in enumerate(sorted(bram_list)):
 						cur_bank = 2*(pos.x > 16) + (pos.y > 16)

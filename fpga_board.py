@@ -12,7 +12,7 @@ import time
 sys.path.append("/usr/local/bin")
 import icebox
 
-from .configuration import Configuration
+from .configuration import BinOpt, Configuration
 from .serial_utils import is_valid_serial_number
 
 class ConfigurationError(Exception):
@@ -99,8 +99,8 @@ class FPGABoard:
 		self._close()
 		return False
 	
-	def configure(self, config: Configuration) -> None:
-		bitstream = config.get_bitstream()
+	def configure(self, config: Configuration, opt: BinOpt=BinOpt()) -> None:
+		bitstream = config.get_bitstream(opt)
 		self.flash_bitstream(bitstream)
 	
 	def flash_bitstream(self, bitstream: bytes) -> None:
