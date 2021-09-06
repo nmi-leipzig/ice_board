@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-import os
-import sys
-from dataclasses import dataclass
-from typing import NamedTuple, List
-import time
 import json
-
-from io import BytesIO
-
+import os
+import random
+import sys
+import time
 import unittest
+
+from dataclasses import dataclass
+from io import BytesIO
+from itertools import combinations
+from typing import NamedTuple, List
+
 import numpy as np
 
 from ..configuration import BinOpt, Configuration
@@ -591,6 +593,51 @@ class ConfigurationTest(unittest.TestCase):
 						val = fpga.read_integers(256, data_width=2)
 						exp = dut.get_bram_values(tile, 0, 256, BRAMMode.BRAM_256x16)
 						self.assertEqual(exp, val)
+	
+	@unittest.skipIf(len(FPGABoard.get_suitable_serial_numbers())<1, "no suitable boards found")
+	def test_bram_with_hardware(self):
+		# fill BRAM with known values, overwrite part of the BRAM and read back whole BRAM to check iff the overwriten
+		# values changed
+		prev_conf = Configuration.create_blank()
+		
+		bin_path = self.get_data("whole_bram.512x8.bin", must_exist=True)
+		with open(bin_path, "rb") as bin_file:
+			send_conf = Configuration.create_blank()
+			send_conf.read_bin(bin_file)
+		mode = BRAMMode.BRAM_512x8
+		val_count = Configuration.block_size_from_mode(mode)
+		max_val = 1 << Configuration.value_length_from_mode(mode) - 1
+		bram_list = list(send_conf._bram.keys())
+		
+		bank_indices = list(range(4))
+		for bank_numbers in [c for l in range(len(bank_indices)+1) for c in combinations(bank_indices, l)]:
+			with self.subTest(bank_numbers=bank_numbers):
+				prev_data = {p: [random.randint(0, max_val) for _ in range(val_count)] for p in bram_list}
+				new_data = {p: [random.randint(0, max_val) for _ in range(val_count)] for p in bram_list}
+				
+				for pos, data in prev_data.items():
+					prev_conf.set_bram_values(pos, data, 0, mode)
+				for pos, data in new_data.items():
+					send_conf.set_bram_values(pos, data, 0, mode)
+				
+				
+				with FPGABoard.get_suitable_board() as fpga:
+					# write previous BRAM values
+					fpga.configure(prev_conf)
+					
+					# write send bitstream and the new BRAM values
+					new_bs = send_conf.get_bitstream(BinOpt(detect_used_bram=False, bram_banks=bank_numbers))
+					fpga.flash_bitstream(new_bs)
+					
+					for i, pos in enumerate(sorted(bram_list)):
+						cur_bank = 2*(pos.x > 16) + (pos.y > 16)
+						fpga.uart.write(i.to_bytes(1, "little"))
+						res = fpga.read_integers(val_count, data_width=1)
+						
+						if cur_bank in bank_numbers:
+							self.assertEqual(new_data[pos], res)
+						else:
+							self.assertEqual(prev_data[pos], res)
 	
 	def test_access_bram_matching(self):
 		# test that reading and writing BRAM banks go together
