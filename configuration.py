@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
 import binascii
-import os
-from array import array
-import timeit
 
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from io import BytesIO
-from itertools import zip_longest
-from typing import Any, BinaryIO, Iterable, List, NamedTuple, NewType, Optional, Sequence, TextIO, Tuple
+from typing import BinaryIO, Iterable, List, NewType, Optional, TextIO, Tuple
 
 import numpy as np
 
