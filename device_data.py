@@ -4,10 +4,10 @@ import enum
 
 TileType = enum.Enum("TileType", ["LOGIC", "IO", "RAM_T", "RAM_B"])
 class BRAMMode(enum.Enum):
-	BRAM_256x16 = 0
-	BRAM_512x8 = 1
-	BRAM_1024x4 = 2
-	BRAM_2048x2 = 3
+	BRAM_256X16 = 0
+	BRAM_512X8 = 1
+	BRAM_1024X4 = 2
+	BRAM_2048X2 = 3
 
 class TilePosition(NamedTuple):
 	x: int
