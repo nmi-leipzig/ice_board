@@ -626,11 +626,11 @@ class ConfigurationTest(unittest.TestCase):
 		# values changed
 		prev_conf = Configuration.create_blank()
 		
-		bin_path = self.get_data("whole_bram.512x8.bin", must_exist=True)
+		bin_path = self.get_data("read_bram_random.bin", must_exist=True)
 		with open(bin_path, "rb") as bin_file:
 			send_conf = Configuration.create_blank()
 			send_conf.read_bin(bin_file)
-		mode = BRAMMode.BRAM_512x8
+		mode = BRAMMode.BRAM_256x16
 		val_count = Configuration.block_size_from_mode(mode)
 		max_val = 1 << Configuration.value_length_from_mode(mode) - 1
 		bram_list = list(send_conf._bram.keys())
@@ -657,7 +657,7 @@ class ConfigurationTest(unittest.TestCase):
 					for i, pos in enumerate(sorted(bram_list)):
 						cur_bank = 2*(pos.x > 16) + (pos.y > 16)
 						fpga.uart.write(i.to_bytes(1, "little"))
-						res = fpga.read_integers(val_count, data_width=1)
+						res = fpga.read_integers(val_count, data_width=2)
 						
 						if cur_bank in bank_numbers:
 							self.assertEqual(new_data[pos], res)
