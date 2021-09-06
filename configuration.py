@@ -725,7 +725,6 @@ class Configuration:
 			
 			# IO in x direction
 			x_off = self._spec.tile_type_width[self._tile_types[TilePosition(x_range[0], y_range[0])]]
-			io_width = self._spec.tile_type_width[TileType.IO]
 			for tile_x in x_range[1:]:
 				# width is defined by the other tile i the row, not the IO tile
 				row_width = self._spec.tile_type_width[self._tile_types[TilePosition(tile_x, y_range[0])]]
