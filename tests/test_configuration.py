@@ -6,6 +6,7 @@ import sys
 import time
 import unittest
 
+from contextlib import ExitStack
 from dataclasses import dataclass
 from io import BytesIO
 from itertools import combinations
@@ -492,8 +493,23 @@ class ConfigurationTest(unittest.TestCase):
 				os.remove(out_filename)
 	
 	def test_skip_unused_bram(self):
-		for bin_file, asc_file in self.iter_bin_asc_pairs():
-			with self.subTest(asc_name=os.path.basename(asc_file.name)):
+		test_data = [
+			("echo.bin", "echo.asc", []),
+			("send_all_bram.256x16.25_27.bin", "send_all_bram.256x16.25_27.asc", [3]),
+			("read_bram_random.bin", "read_bram_random.asc", [0, 1, 2, 3]),
+		]
+		
+		mode = BRAMMode.BRAM_512x8
+		val_count = Configuration.block_size_from_mode(mode)
+		max_val = 1 << Configuration.value_length_from_mode(mode) - 1
+		for bin_filename, asc_filename, bank_numbers in test_data:
+			with ExitStack() as stack:
+				stack.enter_context(self.subTest(asc_name=os.path.basename(asc_filename)))
+				bin_path = self.get_data(bin_filename, must_exist=True)
+				bin_file = stack.enter_context(open(bin_path, "rb"))
+				asc_path = self.get_data(asc_filename, must_exist=True)
+				asc_file = stack.enter_context(open(asc_path, "r"))
+				
 				out_filename = f"tmp.test_skip_unused_bram.{os.path.basename(bin_file.name)}"
 				
 				exp = Configuration.create_blank()
@@ -501,6 +517,16 @@ class ConfigurationTest(unittest.TestCase):
 				
 				dut = Configuration.create_blank()
 				dut.read_bin(bin_file)
+				# write known values
+				bram_list = list(dut._bram.keys())
+				new_data = {p: [random.randint(0, max_val) for _ in range(val_count)] for p in bram_list}
+				for pos, data in new_data.items():
+					dut.set_bram_values(pos, data, 0, mode)
+					
+					cur_bank = 2*(pos.x > 16) + (pos.y > 16)
+					if cur_bank in bank_numbers:
+						exp.set_bram_values(pos, data, 0, mode)
+				
 				with open(out_filename, "wb") as out_file:
 					dut.write_bin(out_file, BinOpt(detect_used_bram=True))
 				

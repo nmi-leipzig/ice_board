@@ -660,7 +660,7 @@ class Configuration:
 		
 		# write BRAM
 		if opt.detect_used_bram:
-			out_banks = [b for b in range(len(bram)) if self._bram_bank_used(bank_number)]
+			out_banks = [b for b in range(len(bram)) if self._bram_bank_used(b)]
 		elif opt.bram_banks is None:
 			out_banks = list(range(len(bram)))
 		else:
