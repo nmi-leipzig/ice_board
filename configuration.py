@@ -25,7 +25,6 @@ class FreqRange(IntEnum):
 
 class MalformedBitstreamError(Exception):
 	"""Raised when an incorrect bitstream is encountered."""
-	pass
 
 @dataclass
 class BinOpt:
