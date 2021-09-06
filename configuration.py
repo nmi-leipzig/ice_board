@@ -560,7 +560,7 @@ class Configuration:
 				self._warmboot = (payload & WARMBOOT_MASK) != 0
 			else:
 				# opcode 4 (set boot address) not supported
-				raise MalformedBitstreamError(f"Unknown opcode {opcode:1x}")
+				raise MalformedBitstreamError(f"Unknown opcode {opcode:1x} at 0x{file_offset}")
 		
 		self._read_cram_banks(cram)
 		self._read_bram_banks(bram)
