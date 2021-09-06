@@ -392,7 +392,7 @@ class Configuration:
 		asc_file.write(f".device {self._spec.asc_name }\n")
 		
 		if not self._warmboot:
-			asc_file.write(f".warmboot disabled\n")
+			asc_file.write(".warmboot disabled\n")
 		
 		for pos in sorted(self._tiles):
 			tile_type = self._tile_types[pos]
