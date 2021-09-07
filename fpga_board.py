@@ -231,7 +231,10 @@ class FPGABoard:
 		return out
 	
 	@classmethod
-	def get_suitable_board(cls, baudrate=3000000, timeout=0.5, black_list=[]):
+	def get_suitable_board(cls, baudrate=3000000, timeout=0.5, black_list=None):
+		if black_list is None:
+			black_list = []
+		
 		suitable = set(cls.get_suitable_serial_numbers())
 		
 		suitable.difference_update(black_list)
