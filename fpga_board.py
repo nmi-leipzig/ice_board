@@ -9,9 +9,6 @@ import logging
 import os
 import time
 
-sys.path.append("/usr/local/bin")
-import icebox
-
 from .configuration import BinOpt, Configuration
 from .serial_utils import is_valid_serial_number
 
