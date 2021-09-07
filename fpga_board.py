@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 
-from pyftdi.ftdi import Ftdi
-import pyftdi.serialext
-import signal
-import subprocess
 import logging
 import os
+import signal
+import subprocess
 import time
+
+from typing import List, Optional
+
+import pyftdi.serialext
+
+from serial import SerialBase
+from pyftdi.ftdi import Ftdi
 
 from .configuration import BinOpt, Configuration
 from .serial_utils import is_valid_serial_number
@@ -24,7 +29,7 @@ class FPGABoard:
 	CDONE = 1 << 6 # ADBUS6
 	CRESET = 1 << 7 # ADBUS7
 	
-	def __init__(self, serial_number, baudrate=3000000, timeout=0.5):
+	def __init__(self, serial_number: str, baudrate: int=3000000, timeout: float=0.5) -> None:
 		self._log = logging.getLogger(type(self).__name__)
 		self._serial_number = serial_number
 		self._is_open = False
@@ -45,22 +50,22 @@ class FPGABoard:
 		self._is_open = True
 	
 	@property
-	def uart(self):
+	def uart(self) -> SerialBase:
 		return self._uart
 	
 	@property
-	def serial_number(self):
+	def serial_number(self) -> str:
 		return self._serial_number
 	
-	def close(self):
+	def close(self) -> None:
 		self._close()
 	
-	def read_bytes(self, byte_count):
+	def read_bytes(self, byte_count: int) -> bytes:
 		response = self._uart.read(byte_count)
 		# reverse from little endian
 		return response[::-1]
 	
-	def read_integers(self, count=1, data_width=1):
+	def read_integers(self, count: int=1, data_width: int=1) -> List[int]:
 		res = []
 		for _ in range(count):
 			raw_data = self._uart.read(data_width)
@@ -70,7 +75,7 @@ class FPGABoard:
 		
 		return res
 	
-	def _close(self):
+	def _close(self) -> None:
 		if not self._is_open:
 			return
 		
@@ -78,16 +83,16 @@ class FPGABoard:
 		self._mpsse_dev.close()
 		self._is_open = False
 	
-	def reset_buffer(self, rst_input=True, rst_output=True):
+	def reset_buffer(self, rst_input: bool=True, rst_output: bool=True) -> None:
 		if rst_input:
 			self._uart.reset_input_buffer()
 		if rst_output:
 			self._uart.reset_output_buffer()
 	
-	def flush(self):
+	def flush(self) -> None:
 		self._uart.flush()
 	
-	def __enter__(self):
+	def __enter__(self) -> "FPGABoard":
 		self._uart.reset_input_buffer()
 		return self
 	
@@ -189,33 +194,33 @@ class FPGABoard:
 		
 		# SPI pins now also available as user IO (from the FPGA perspective), but they are not used
 	
-	def _set_gpio_out(self, value):
+	def _set_gpio_out(self, value: int) -> None:
 		cmd = bytearray()
 		self._extend_by_gpio(cmd, value)
 		self._mpsse_dev.write_data(cmd)
 	
-	def _extend_by_gpio(self, cmd, value):
+	def _extend_by_gpio(self, cmd: bytearray, value: int) -> None:
 		cmd.extend((Ftdi.SET_BITS_LOW, value, self._direction))
 	
-	def _get_cdone(self):
+	def _get_cdone(self) -> bool:
 		cmd = bytes((Ftdi.GET_BITS_LOW, Ftdi.SEND_IMMEDIATE))
 		self._mpsse_dev.write_data(cmd)
 		gpio = self._mpsse_dev.read_data_bytes(1, 4)[0]
 		return (gpio & self.CDONE) != 0
 	
 	@classmethod
-	def pack_bitstream(cls, asc_name, bitstream_name, compress=False):
+	def pack_bitstream(cls, asc_name: str, bitstream_name: str, compress: bool=False) -> None:
 		cmd = ["icepack", asc_name, bitstream_name]
 		if compress:
 			cmd.append("-z")
 		cls.no_int_subprocess(cmd)
 	
 	@staticmethod
-	def ignore_sigint():
+	def ignore_sigint() -> None:
 		signal.signal(signal.SIGINT, signal.SIG_IGN)
 	
 	@classmethod
-	def no_int_subprocess(cls, cmd):
+	def no_int_subprocess(cls, cmd: List[str]) -> str:
 		"""run subprocess so it doesn't receive SIGINT"""
 		
 		out = subprocess.check_output(
@@ -229,7 +234,7 @@ class FPGABoard:
 		return out
 	
 	@classmethod
-	def get_suitable_board(cls, baudrate=3000000, timeout=0.5, black_list=None):
+	def get_suitable_board(cls, baudrate: int=3000000, timeout: float=0.5, black_list: Optional[List[str]]=None) -> "FPGABoard":
 		if black_list is None:
 			black_list = []
 		
@@ -243,7 +248,7 @@ class FPGABoard:
 		return cls(suitable.pop(), baudrate, timeout)
 	
 	@staticmethod
-	def get_suitable_serial_numbers():
+	def get_suitable_serial_numbers() -> List[str]:
 		ft2232_devices = Ftdi.find_all([(0x0403, 0x6010)], True)
 		
 		suitable = []
@@ -254,5 +259,5 @@ class FPGABoard:
 		return suitable
 	
 	@staticmethod
-	def usleep(usec):
+	def usleep(usec: float) -> None:
 		time.sleep(usec/1000000)
