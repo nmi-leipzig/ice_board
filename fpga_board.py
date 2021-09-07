@@ -173,8 +173,7 @@ class FPGABoard:
 		cmd.extend((Ftdi.CLK_BYTES_NO_DATA, 0x0b, 0x00, Ftdi.CLK_BITS_NO_DATA, 0x03))
 		
 		self._log.debug("Write flash command")
-		o = self._mpsse_dev.write_data(cmd)
-		#self._log.debug("flash offset: {}".format(o))
+		self._mpsse_dev.write_data(cmd)
 		
 		self._log.debug("Check success of flash")
 		# check CDONE
