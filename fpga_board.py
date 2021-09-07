@@ -134,7 +134,7 @@ class FPGABoard:
 		self._flash_bitstream_spi(bitstream)
 	
 	def _flash_bitstream_spi(self, bitstream: bytes) -> None:
-		self._log.debug("CDONE: {}".format("high" if self._get_cdone() else "low"))
+		self._log.debug("CDONE: %s", "high" if self._get_cdone() else "low")
 		
 		# creset to low
 		# chip select to low to trigger configuration as SPI peripheral
