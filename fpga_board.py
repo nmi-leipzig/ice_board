@@ -3,7 +3,6 @@
 from pyftdi.ftdi import Ftdi
 import pyftdi.serialext
 import signal
-import sys
 import subprocess
 import logging
 import os
