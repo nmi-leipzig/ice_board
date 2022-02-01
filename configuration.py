@@ -42,6 +42,9 @@ class BinOpt:
 	# 4 -> in addition to 3, order writes by chunk size to reduce number of set height commands
 	optimize: int = 0
 	skip_comment: bool = False
+	# even if the CRAM width in bits is not a multiple of 8, the data of a chunk has to be a multipple of 8;
+	# the following flag forces also the data before each chunk (i.e. offset*cram_width) to be a multiple of 8
+	align_chunks: bool = True
 
 class CRC:
 	def __init__(self) -> None:
@@ -155,7 +158,10 @@ class BinOut:
 		self._bank_offset = offset
 	
 	def data_from_xram(self, xram: Banks) -> bytes:
-		return np.packbits(xram[self._bank_number, self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
+		data = np.packbits(xram[self._bank_number, self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
+		if len(data)*8 != self._bank_height*self._bank_width:
+			raise ValueError(f"incomplete bytes: {self._bank_height*self._bank_width} bits in {len(data)} bytes")
+		return data
 	
 	def write_cram(self, cram: Banks) -> None:
 		data = self.data_from_xram(cram)
@@ -487,15 +493,18 @@ class Configuration:
 		
 		def get_data_len():
 			try:
-				return bank_width*bank_height//8
+				return (bank_width*bank_height+7)//8 # round up
 			except TypeError as te:
 				raise MalformedBitstreamError("Block height and width have to be set before writig data") from te
 		
 		def data_to_xram(data, xram):
 			for y in range(bank_height):
+				fst = y*bank_width//8
+				lst = ((y+1)*bank_width+7)//8 # round up
 				# msb first
 				bit_data = [
-					(b<<i) & 0x80 != 0 for b in data[y*bank_width//8:(y+1)*bank_width//8] for i in range(8)
+					(b<<i) & 0x80 != 0 for c, b in enumerate(data[fst:lst])
+					for i in range(max(0, y*bank_width-8*fst-8*c), min(8, (y+1)*bank_width-8*fst-8*c))
 				]
 				xram[bank_nr][y+bank_offset][0:bank_width] = bit_data
 			
@@ -522,11 +531,15 @@ class Configuration:
 			
 			if opcode == 0:
 				if payload == 1:
+					if bank_width != self._spec.cram_width:
+						raise ValueError(f"Wrong CRAM width: expected {self._spec.cram_width},but was {bank_width}")
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, cram)
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp} after CRAM data, got 0x{val}")
 				elif payload == 3:
+					if bank_width != self._spec.bram_width:
+						raise ValueError(f"Wrong BRAM width: expected {self._spec.bram_width},but was {bank_width}")
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, bram)
@@ -628,6 +641,7 @@ class Configuration:
 				bin_out.set_bank_offset(0, reuse)
 		
 		# write CRAM
+		granularity = np.lcm(self._spec.cram_width, 8)//self._spec.cram_width
 		for bank_number in out_banks:
 			bin_out.set_bank_number(bank_number, reuse)
 			
@@ -636,17 +650,7 @@ class Configuration:
 				bin_out.write_cram(cram)
 				continue
 			
-			# find none False rows
-			to_write = np.any(cram[bank_number], axis=1)
-			#print(np.nonzero(to_write))
-			prev_write = np.roll(to_write, 1)
-			prev_write[0] = False
-			next_write = np.roll(to_write, -1)
-			next_write[-1] = False
-			first_indices = np.nonzero(to_write & ~prev_write)[0]
-			last_indices = np.nonzero(to_write & ~next_write)[0]
-			chunk_size = last_indices - first_indices + 1
-			areas = np.column_stack((first_indices, chunk_size))
+			areas = self.get_nonzero_chunks(cram[bank_number], granularity, opt.align_chunks)
 			
 			if opt.optimize >= 4:
 				# sort by chunk size to set bank height less often
@@ -841,6 +845,65 @@ class Configuration:
 				start = org_slice.stop + 1
 		
 		return slice(start, stop, step)
+	
+	@staticmethod
+	def set_with_granularity_aligned(to_write: np.ndarray, granularity: int) -> None:
+		assert len(to_write) % granularity == 0
+		
+		for i in range(0, len(to_write), granularity):
+			if any(to_write[i:i+granularity]):
+				to_write[i:i+granularity] = [True]*granularity
+	
+	@staticmethod
+	def set_with_granularity_unaligned(to_write: np.ndarray, granularity: int) -> None:
+		i = 0
+		while i < len(to_write):
+			if not to_write[i]:
+				i += 1
+				continue
+			for j in range(1, granularity):
+				try:
+					to_write[i+j] = True
+				except IndexError:
+					break
+			i += j + 1
+	
+	@classmethod
+	def get_nonzero_chunks(cls, data: np.ndarray, granularity: int, align: bool) -> np.ndarray:
+		"""Extracts which rows of data are nonzero and group them in chunks.
+		The length of each chunk will be divisable by the granularity. If the align flag is set the offset of each
+		chunk will also be divisable by the granularity.
+		
+		Returns a 2d-array with a row for each chunk, the first column as the offset of the chunks (i.e. the index
+		of the first data row of the chunks) the second column as the chunk length.
+		"""
+		# find none False rows
+		to_write = np.any(data, axis=1)
+		if granularity > 1:
+			if align:
+				cls.set_with_granularity_aligned(to_write, granularity)
+			else:
+				cls.set_with_granularity_unaligned(to_write, granularity)
+			
+		prev_write = np.roll(to_write, 1)
+		prev_write[0] = False
+		next_write = np.roll(to_write, -1)
+		next_write[-1] = False
+		first_indices = np.nonzero(to_write & ~prev_write)[0]
+		last_indices = np.nonzero(to_write & ~next_write)[0]
+		chunk_size = last_indices - first_indices + 1
+		
+		if not align and chunk_size[-1] % granularity != 0:
+			# for not aligned chunks the last chunk can be too short as there may be not enough rows following the last
+			# nonzero row to get a chunk of granularity size
+			# -> simply add the rows before to the chunk
+			# the added rows may be written twice
+			cor = granularity - (chunk_size[-1] % granularity)
+			chunk_size[-1] += cor
+			first_indices[-1] -= cor
+		assert all([c%granularity==0 for c in chunk_size]) # only full bytes are written to CRAM
+		
+		return np.column_stack((first_indices, chunk_size))
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
