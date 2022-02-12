@@ -222,6 +222,9 @@ class Configuration:
 				self._bram[pos] = np.full((16, 256), False, dtype=bool)
 		
 	
+	def get_tile_type(self, pos: TilePosition) -> TileType:
+		return self._tile_types[pos]
+	
 	def get_bit(self, x: int, y: int, group: int, index: int) -> bool:
 		return self._tiles[(x, y)][group, index]
 	
